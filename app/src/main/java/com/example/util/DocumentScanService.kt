@@ -135,13 +135,59 @@ class DocumentScanService(
             })
         }
 
-        val modelsToTry = listOf(
+        // Dynamically query available models for this specific API key if possible
+        val dynamicallyAvailableModels = mutableListOf<String>()
+        try {
+            val listModelsUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey"
+            val listRequest = Request.Builder()
+                .url(listModelsUrl)
+                .addHeader("x-goog-api-key", apiKey)
+                .get()
+                .build()
+            val listResp = httpClient.newCall(listRequest).execute()
+            if (listResp.isSuccessful) {
+                val listBody = listResp.body?.string() ?: ""
+                val modelsArr = JSONObject(listBody).optJSONArray("models")
+                if (modelsArr != null) {
+                    for (i in 0 until modelsArr.length()) {
+                        val m = modelsArr.optJSONObject(i) ?: continue
+                        val name = m.optString("name").removePrefix("models/")
+                        val methods = m.optJSONArray("supportedGenerationMethods")
+                        val supportsGenerate = methods != null && (0 until methods.length()).any { 
+                            methods.optString(it) == "generateContent" 
+                        }
+                        if (supportsGenerate) {
+                            dynamicallyAvailableModels.add(name)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to list models dynamically: ${e.message}")
+        }
+
+        // Prioritize fast/flash models
+        val prioritizedDynamic = dynamicallyAvailableModels.sortedByDescending { model ->
+            when {
+                model.contains("flash") -> 3
+                model.contains("pro") -> 2
+                else -> 1
+            }
+        }
+
+        val fallbackModels = listOf(
             "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
             "gemini-1.5-flash-latest",
             "gemini-1.5-flash",
             "gemini-1.5-pro",
-            "gemini-2.0-flash"
+            "gemini-pro"
         )
+
+        val modelsToTry = (prioritizedDynamic + fallbackModels).distinct()
 
         var lastErrorMessage = ""
         var lastErrorCode = 0
@@ -163,8 +209,8 @@ class DocumentScanService(
                     lastErrorCode = response.code
                     lastErrorMessage = responseBody
                     Log.w(TAG, "Model $modelName returned ${response.code}: $responseBody")
-                    // If it's 404 (model not found/available for this key), try next fallback model
-                    if (response.code != 404) {
+                    // If it's 404 (model deprecated / not found) or 400 (bad model), continue to next model
+                    if (response.code != 404 && !responseBody.contains("no longer", ignoreCase = true)) {
                         break
                     }
                 }
