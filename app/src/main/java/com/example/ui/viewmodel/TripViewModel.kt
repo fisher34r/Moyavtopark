@@ -659,6 +659,15 @@ class TripViewModel(
             toDelete.forEach { repository.deleteTrip(it) }
         }
     }
+
+    fun insertTrips(trips: List<Trip>, onComplete: ((List<Long>) -> Unit)? = null) {
+        viewModelScope.launch {
+            val ids = repository.insertTrips(trips)
+            withContext(Dispatchers.Main) {
+                onComplete?.invoke(ids)
+            }
+        }
+    }
 }
 
 class TripViewModelFactory(

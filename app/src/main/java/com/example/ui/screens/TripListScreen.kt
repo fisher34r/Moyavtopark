@@ -55,6 +55,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.core.content.FileProvider
+import java.io.File
+import android.net.Uri
+import com.example.util.DocumentScanService
+import com.example.util.ScanResult
+import com.example.util.TripNumberUtils
+import com.example.ui.components.BatchScanReviewDialog
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -184,6 +199,60 @@ fun TripListScreen(
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
         ).show()
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    val scanService = remember { DocumentScanService(context, viewModel.settings) }
+    var isScanningDocument by remember { mutableStateOf(false) }
+    var scannedTripsForReview by remember { mutableStateOf<List<com.example.util.ScannedTripItem>?>(null) }
+    var scannedDocType by remember { mutableStateOf("Накладная") }
+    var tempCameraImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun processScannedImage(uri: Uri) {
+        isScanningDocument = true
+        coroutineScope.launch {
+            when (val res = scanService.scanDocumentFromUri(uri)) {
+                is ScanResult.Success -> {
+                    isScanningDocument = false
+                    scannedDocType = res.documentType
+                    scannedTripsForReview = res.trips
+                }
+                is ScanResult.Error -> {
+                    isScanningDocument = false
+                    Toast.makeText(context, res.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            tempCameraImageUri?.let { uri ->
+                processScannedImage(uri)
+            }
+        }
+    }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            processScannedImage(it)
+        }
+    }
+
+    val onLaunchCamera = {
+        try {
+            val cacheDir = File(context.cacheDir, "scan_images").apply { mkdirs() }
+            val photoFile = File.createTempFile("scan_", ".jpg", cacheDir)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            tempCameraImageUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Не удалось открыть камеру: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -536,6 +605,35 @@ fun TripListScreen(
                             )
                         }
                     } else {
+                        if (isScanningDocument) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp).padding(end = 8.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            IconButton(
+                                onClick = { onLaunchCamera() },
+                                modifier = Modifier.testTag("list_camera_scan_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Сфотографировать документ",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(
+                                onClick = { pickImageLauncher.launch("image/*") },
+                                modifier = Modifier.testTag("list_gallery_scan_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoLibrary,
+                                    contentDescription = "Выбрать из галереи",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
                         if (onNavigateToReports != null) {
                             IconButton(
                                 onClick = onNavigateToReports,
@@ -1008,6 +1106,28 @@ fun TripListScreen(
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) {
                     Text("Отмена")
+                }
+            }
+        )
+    }
+
+    scannedTripsForReview?.let { tripsToReview ->
+        BatchScanReviewDialog(
+            scannedTrips = tripsToReview,
+            documentType = scannedDocType,
+            onDismiss = { scannedTripsForReview = null },
+            onSaveSelected = { selectedItems ->
+                scannedTripsForReview = null
+                var currentLastNum = viewModel.settings.lastTripNumber
+                val tripsToInsert = selectedItems.map { item ->
+                    scanService.createTripFromScanned(item) {
+                        val next = TripNumberUtils.generateNextTripNumber(currentLastNum)
+                        currentLastNum = next
+                        next
+                    }
+                }
+                viewModel.insertTrips(tripsToInsert) {
+                    Toast.makeText(context, "Добавлено рейсов: ${tripsToInsert.size}", Toast.LENGTH_SHORT).show()
                 }
             }
         )

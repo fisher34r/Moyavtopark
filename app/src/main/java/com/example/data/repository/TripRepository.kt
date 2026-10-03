@@ -25,6 +25,14 @@ class TripRepository(
         return id
     }
 
+    suspend fun insertTrips(trips: List<Trip>): List<Long> {
+        val ids = tripDao.insertTrips(trips)
+        trips.lastOrNull()?.let { last ->
+            settingsPreferences.saveLastTripData(last)
+        }
+        return ids
+    }
+
     suspend fun updateTrip(trip: Trip) {
         tripDao.updateTrip(trip)
         settingsPreferences.saveLastTripData(trip)

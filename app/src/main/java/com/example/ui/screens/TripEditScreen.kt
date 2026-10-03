@@ -47,17 +47,29 @@ import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import com.example.util.RouteResult
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.util.RouteResult
+import androidx.core.content.FileProvider
+import java.io.File
+import com.example.util.DocumentScanService
+import com.example.util.ScanResult
+import com.example.util.TripNumberUtils
+import com.example.ui.components.BatchScanReviewDialog
+import android.net.Uri
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -235,6 +247,77 @@ fun TripEditScreen(
         mutableStateOf(tripToEdit?.notes ?: "")
     }
 
+    val scanService = remember { DocumentScanService(context, viewModel.settings) }
+    var isScanningDocument by remember { mutableStateOf(false) }
+    var scannedTripsForReview by remember { mutableStateOf<List<com.example.util.ScannedTripItem>?>(null) }
+    var scannedDocType by remember { mutableStateOf("Накладная") }
+    var tempCameraImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun processScannedImage(uri: Uri) {
+        isScanningDocument = true
+        coroutineScope.launch {
+            when (val res = scanService.scanDocumentFromUri(uri)) {
+                is ScanResult.Success -> {
+                    isScanningDocument = false
+                    if (res.trips.size == 1) {
+                        // Одиночная накладная: сразу предзаполняем поля текущей формы
+                        val item = res.trips.first()
+                        if (item.cargoType.isNotBlank()) cargoType = item.cargoType
+                        if (item.loadingLocation.isNotBlank()) loadingLocation = item.loadingLocation
+                        if (item.unloadingLocation.isNotBlank()) unloadingLocation = item.unloadingLocation
+                        if (item.weightTons > 0) weightText = String.format(Locale.US, "%.2f", item.weightTons)
+                        if (item.distanceKm > 0) distanceText = String.format(Locale.US, "%.0f", item.distanceKm)
+                        if (item.ttnNumber.isNotBlank()) ttnNumber = item.ttnNumber
+                        if (item.truckPlate.isNotBlank()) truckPlate = item.truckPlate
+                        if (item.driverName.isNotBlank()) driverName = item.driverName
+                        if (item.customerName.isNotBlank()) customerName = item.customerName
+                        if (item.tripNumber.isNotBlank()) tripNumber = item.tripNumber
+
+                        Toast.makeText(context, "Данные накладной успешно распознаны!", Toast.LENGTH_SHORT).show()
+                    } else if (res.trips.size > 1) {
+                        // Таблица / ведомость: открываем диалог проверки строк
+                        scannedDocType = res.documentType
+                        scannedTripsForReview = res.trips
+                    }
+                }
+                is ScanResult.Error -> {
+                    isScanningDocument = false
+                    Toast.makeText(context, res.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            tempCameraImageUri?.let { uri ->
+                processScannedImage(uri)
+            }
+        }
+    }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            processScannedImage(it)
+        }
+    }
+
+    val onLaunchCamera = {
+        try {
+            val cacheDir = File(context.cacheDir, "scan_images").apply { mkdirs() }
+            val photoFile = File.createTempFile("scan_", ".jpg", cacheDir)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            tempCameraImageUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Не удалось открыть камеру: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     var driverDropdownExpanded by remember { mutableStateOf(false) }
     var truckDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -358,6 +441,36 @@ fun TripEditScreen(
                         )
                     }
                 },
+                actions = {
+                    if (isScanningDocument) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(end = 8.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        IconButton(
+                            onClick = { onLaunchCamera() },
+                            modifier = Modifier.testTag("camera_scan_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Сфотографировать документ",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = { pickImageLauncher.launch("image/*") },
+                            modifier = Modifier.testTag("gallery_scan_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoLibrary,
+                                contentDescription = "Выбрать из галереи",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -450,6 +563,73 @@ fun TripEditScreen(
                 rateValue = parsedRateValue,
                 driverSalaryPercent = parsedSalaryPercent
             )
+
+            // Quick Document Scanner Banner
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onLaunchCamera() },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Заполнить по фото документа",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Сфотографируйте ТТН, талон или ведомость зерновоза",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (isScanningDocument) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick = { onLaunchCamera() },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Фото", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
 
             // Auto-fill notice banner when creating a new trip with remembered values
             if (!isEditing && rememberedData.isAutoFilledFromPrevious) {
@@ -1422,5 +1602,28 @@ fun TripEditScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    scannedTripsForReview?.let { tripsToReview ->
+        BatchScanReviewDialog(
+            scannedTrips = tripsToReview,
+            documentType = scannedDocType,
+            onDismiss = { scannedTripsForReview = null },
+            onSaveSelected = { selectedItems ->
+                scannedTripsForReview = null
+                var currentLastNum = viewModel.settings.lastTripNumber
+                val tripsToInsert = selectedItems.map { item ->
+                    scanService.createTripFromScanned(item) {
+                        val next = TripNumberUtils.generateNextTripNumber(currentLastNum)
+                        currentLastNum = next
+                        next
+                    }
+                }
+                viewModel.insertTrips(tripsToInsert) {
+                    Toast.makeText(context, "Добавлено рейсов: ${tripsToInsert.size}", Toast.LENGTH_SHORT).show()
+                    onBack()
+                }
+            }
+        )
     }
 }
