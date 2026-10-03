@@ -143,6 +143,7 @@ fun TripSettingsScreen(
     var detourPercent by remember { mutableDoubleStateOf(viewModel.settings.routeDetourPercent) }
     var yandexApiKey by remember { mutableStateOf(viewModel.settings.yandexApiKey) }
     var geminiApiKey by remember { mutableStateOf(viewModel.settings.geminiApiKey) }
+    var geminiProxyUrl by remember { mutableStateOf(viewModel.settings.geminiProxyUrl) }
     var cachedRoutesCount by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
@@ -310,6 +311,7 @@ fun TripSettingsScreen(
                         viewModel.settings.routeDetourPercent = detourPercent
                         viewModel.settings.yandexApiKey = yandexApiKey.trim()
                         viewModel.settings.geminiApiKey = geminiApiKey.trim()
+                        viewModel.settings.geminiProxyUrl = geminiProxyUrl.trim()
                         Toast.makeText(context, "Настройки сохранены", Toast.LENGTH_SHORT).show()
                         onBack()
                     },
@@ -879,6 +881,21 @@ fun TripSettingsScreen(
                         leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         supportingText = {
                             Text("Позволяет распознавать фото ТТН, талонов и рукописных таблиц с камеры", fontSize = 11.sp)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = geminiProxyUrl,
+                        onValueChange = { geminiProxyUrl = it },
+                        label = { Text("Прокси / Зеркало Gemini (для работы БЕЗ VPN)") },
+                        placeholder = { Text("https://ваше-зеркало.workers.dev") },
+                        leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        supportingText = {
+                            Text("Опционально. Если указано, запросы идут в обход региональных блокировок РФ без включения VPN", fontSize = 11.sp)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true

@@ -220,6 +220,10 @@ class SettingsPreferences(context: Context) {
         get() = prefs.getString("gemini_api_key", "") ?: ""
         set(value) = prefs.edit().putString("gemini_api_key", value).apply()
 
+    var geminiProxyUrl: String
+        get() = prefs.getString("gemini_proxy_url", "") ?: ""
+        set(value) = prefs.edit().putString("gemini_proxy_url", value).apply()
+
     var routeDetourPercent: Double
         get() = prefs.getFloat("route_detour_percent", 5.0f).toDouble()
         set(value) = prefs.edit().putFloat("route_detour_percent", value.toFloat()).apply()

@@ -135,10 +135,18 @@ class DocumentScanService(
             })
         }
 
+        // Determine base URL: either custom proxy or official Google API endpoint
+        val customProxy = settings.geminiProxyUrl.trim().trimEnd('/')
+        val baseUrl = if (customProxy.isNotBlank()) {
+            if (customProxy.startsWith("http://") || customProxy.startsWith("https://")) customProxy else "https://$customProxy"
+        } else {
+            "https://generativelanguage.googleapis.com"
+        }
+
         // Dynamically query available models for this specific API key if possible
         val dynamicallyAvailableModels = mutableListOf<String>()
         try {
-            val listModelsUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey"
+            val listModelsUrl = "$baseUrl/v1beta/models?key=$apiKey"
             val listRequest = Request.Builder()
                 .url(listModelsUrl)
                 .addHeader("x-goog-api-key", apiKey)
@@ -193,7 +201,7 @@ class DocumentScanService(
         var lastErrorCode = 0
 
         for (modelName in modelsToTry) {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+            val url = "$baseUrl/v1beta/models/$modelName:generateContent?key=$apiKey"
             val request = Request.Builder()
                 .url(url)
                 .addHeader("x-goog-api-key", apiKey)
@@ -226,6 +234,12 @@ class DocumentScanService(
             errObj?.optString("message") ?: lastErrorMessage
         } catch (_: Exception) {
             lastErrorMessage
+        }
+
+        if (lastErrorCode == 400 || lastErrorCode == 403 || detailedMessage.contains("User location is not supported", ignoreCase = true)) {
+            return@withContext ScanResult.Error(
+                "Доступ к Gemini AI ограничен из вашего региона (User location is not supported). Включите VPN на телефоне или смените сеть для сканирования."
+            )
         }
 
         return@withContext ScanResult.Error(
