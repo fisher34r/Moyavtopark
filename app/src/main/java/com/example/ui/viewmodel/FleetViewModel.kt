@@ -222,6 +222,38 @@ class FleetViewModel(
         }
     }
 
+    fun batchUpdateVehicles(
+        vehicleIds: Set<Long>,
+        newStatus: VehicleStatus? = null,
+        newAssignedDriverName: String? = null
+    ) {
+        viewModelScope.launch {
+            val allV = vehicles.value
+            val toUpdate = allV.filter { it.id in vehicleIds }.map { v ->
+                v.copy(
+                    status = newStatus ?: v.status,
+                    assignedDriverName = newAssignedDriverName ?: v.assignedDriverName
+                )
+            }
+            fleetRepository.updateVehicles(toUpdate)
+
+            // Если назначен водитель, синхронизируем водителя
+            if (newAssignedDriverName != null) {
+                val driver = drivers.value.firstOrNull { it.fullName.equals(newAssignedDriverName, ignoreCase = true) }
+                if (driver != null) {
+                    val firstPlate = toUpdate.firstOrNull()?.plateNumber ?: ""
+                    fleetRepository.updateDriver(driver.copy(assignedVehiclePlate = firstPlate))
+                }
+            }
+        }
+    }
+
+    fun batchDeleteVehicles(vehicleIds: Set<Long>) {
+        viewModelScope.launch {
+            fleetRepository.deleteVehiclesByIds(vehicleIds.toList())
+        }
+    }
+
     // Actions for Driver
     fun saveDriver(driver: Driver) {
         viewModelScope.launch {
@@ -249,6 +281,31 @@ class FleetViewModel(
     fun deleteDriver(driver: Driver) {
         viewModelScope.launch {
             fleetRepository.deleteDriver(driver)
+        }
+    }
+
+    fun batchUpdateDrivers(
+        driverIds: Set<Long>,
+        newStatus: DriverStatus? = null,
+        newSalaryPercent: Double? = null,
+        newShiftSchedule: String? = null
+    ) {
+        viewModelScope.launch {
+            val allD = drivers.value
+            val toUpdate = allD.filter { it.id in driverIds }.map { d ->
+                d.copy(
+                    status = newStatus ?: d.status,
+                    salaryPercent = newSalaryPercent ?: d.salaryPercent,
+                    shiftSchedule = newShiftSchedule ?: d.shiftSchedule
+                )
+            }
+            fleetRepository.updateDrivers(toUpdate)
+        }
+    }
+
+    fun batchDeleteDrivers(driverIds: Set<Long>) {
+        viewModelScope.launch {
+            fleetRepository.deleteDriversByIds(driverIds.toList())
         }
     }
 

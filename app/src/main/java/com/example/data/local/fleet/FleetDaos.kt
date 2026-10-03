@@ -24,11 +24,23 @@ interface VehicleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: Vehicle): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVehicles(vehicles: List<Vehicle>)
+
     @Update
     suspend fun updateVehicle(vehicle: Vehicle)
 
+    @Update
+    suspend fun updateVehicles(vehicles: List<Vehicle>)
+
     @Delete
     suspend fun deleteVehicle(vehicle: Vehicle)
+
+    @Query("DELETE FROM vehicles WHERE id IN (:ids)")
+    suspend fun deleteVehiclesByIds(ids: List<Long>)
+
+    @Query("DELETE FROM vehicles")
+    suspend fun deleteAllVehicles()
 }
 
 @Dao
@@ -42,11 +54,23 @@ interface DriverDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDriver(driver: Driver): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDrivers(drivers: List<Driver>)
+
     @Update
     suspend fun updateDriver(driver: Driver)
 
+    @Update
+    suspend fun updateDrivers(drivers: List<Driver>)
+
     @Delete
     suspend fun deleteDriver(driver: Driver)
+
+    @Query("DELETE FROM drivers WHERE id IN (:ids)")
+    suspend fun deleteDriversByIds(ids: List<Long>)
+
+    @Query("DELETE FROM drivers")
+    suspend fun deleteAllDrivers()
 }
 
 @Dao
@@ -60,11 +84,17 @@ interface ServiceRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertServiceRecord(record: ServiceRecord): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertServiceRecords(records: List<ServiceRecord>)
+
     @Update
     suspend fun updateServiceRecord(record: ServiceRecord)
 
     @Delete
     suspend fun deleteServiceRecord(record: ServiceRecord)
+
+    @Query("DELETE FROM service_records")
+    suspend fun deleteAllServiceRecords()
 }
 
 @Dao
@@ -78,11 +108,17 @@ interface WaybillDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWaybill(waybill: Waybill): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWaybills(waybills: List<Waybill>)
+
     @Update
     suspend fun updateWaybill(waybill: Waybill)
 
     @Delete
     suspend fun deleteWaybill(waybill: Waybill)
+
+    @Query("DELETE FROM waybills")
+    suspend fun deleteAllWaybills()
 }
 
 @Dao
@@ -93,9 +129,15 @@ interface FleetDocumentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDocument(document: FleetDocument): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDocuments(documents: List<FleetDocument>)
+
     @Update
     suspend fun updateDocument(document: FleetDocument)
 
     @Delete
     suspend fun deleteDocument(document: FleetDocument)
+
+    @Query("DELETE FROM fleet_documents")
+    suspend fun deleteAllDocuments()
 }

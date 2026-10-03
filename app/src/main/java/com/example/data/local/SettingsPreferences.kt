@@ -155,6 +155,63 @@ class SettingsPreferences(context: Context) {
         get() = prefs.getFloat(KEY_LAST_DRIVER_SALARY_PERCENT, defaultDriverSalaryPercent.toFloat()).toDouble()
         set(value) = prefs.edit().putFloat(KEY_LAST_DRIVER_SALARY_PERCENT, value.toFloat()).apply()
 
+    // Cost Calculator Preferences
+    var calcLoadedDistanceKm: Double
+        get() = prefs.getFloat("calc_loaded_dist", 280.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_loaded_dist", value.toFloat()).apply()
+
+    var calcEmptyDistanceKm: Double
+        get() = prefs.getFloat("calc_empty_dist", 100.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_empty_dist", value.toFloat()).apply()
+
+    var calcWeightTons: Double
+        get() = prefs.getFloat("calc_weight_tons", 28.5f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_weight_tons", value.toFloat()).apply()
+
+    var calcFuelConsumptionRate: Double
+        get() = prefs.getFloat("calc_fuel_rate", defaultFuelConsumptionRate.toFloat()).toDouble()
+        set(value) = prefs.edit().putFloat("calc_fuel_rate", value.toFloat()).apply()
+
+    var calcFuelPricePerLiter: Double
+        get() = prefs.getFloat("calc_fuel_price", defaultFuelPricePerLiter.toFloat()).toDouble()
+        set(value) = prefs.edit().putFloat("calc_fuel_price", value.toFloat()).apply()
+
+    var calcDriverPayMode: String // "PER_KM" or "PERCENT"
+        get() = prefs.getString("calc_driver_mode", "PER_KM") ?: "PER_KM"
+        set(value) = prefs.edit().putString("calc_driver_mode", value).apply()
+
+    var calcDriverRatePerKm: Double
+        get() = prefs.getFloat("calc_driver_per_km", 12.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_driver_per_km", value.toFloat()).apply()
+
+    var calcDriverSalaryPercent: Double
+        get() = prefs.getFloat("calc_driver_percent", defaultDriverSalaryPercent.toFloat()).toDouble()
+        set(value) = prefs.edit().putFloat("calc_driver_percent", value.toFloat()).apply()
+
+    var calcDriverPerDiemDaily: Double
+        get() = prefs.getFloat("calc_driver_daily", 1500.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_driver_daily", value.toFloat()).apply()
+
+    var calcPlatonRatePerKm: Double
+        get() = prefs.getFloat("calc_platon_per_km", 3.05f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_platon_per_km", value.toFloat()).apply()
+
+    var calcTollRoadsCost: Double
+        get() = prefs.getFloat("calc_toll_roads", 0.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_toll_roads", value.toFloat()).apply()
+
+    var calcDepreciationRatePerKm: Double
+        get() = prefs.getFloat("calc_deprec_per_km", 5.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_deprec_per_km", value.toFloat()).apply()
+
+    var calcTripDays: Int
+        get() = prefs.getInt("calc_trip_days", 1)
+        set(value) = prefs.edit().putInt("calc_trip_days", value).apply()
+
+    var calcDesiredMarginPercent: Double
+        get() = prefs.getFloat("calc_margin_percent", 20.0f).toDouble()
+        set(value) = prefs.edit().putFloat("calc_margin_percent", value.toFloat()).apply()
+
     fun saveLastTripData(trip: Trip) {
         prefs.edit()
             .putBoolean(KEY_HAS_REMEMBERED_DATA, true)

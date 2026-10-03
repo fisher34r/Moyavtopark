@@ -81,7 +81,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +109,7 @@ fun TripSettingsScreen(
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var driverName by remember { mutableStateOf(viewModel.settings.defaultDriver) }
     var truckPlate by remember { mutableStateOf(viewModel.settings.defaultTruck) }
@@ -809,12 +812,14 @@ fun TripSettingsScreen(
                     // Кнопка: Сохранить на Google Диск
                     OutlinedButton(
                         onClick = {
-                            try {
-                                val uri = BackupService.createShareableBackupUri(context, trips, viewModel.settings)
-                                val shareIntent = BackupService.createGoogleDriveShareIntent(context, uri)
-                                context.startActivity(shareIntent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Не удалось создать файл: ${e.message}", Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                try {
+                                    val uri = viewModel.getShareableBackupUri(context)
+                                    val shareIntent = BackupService.createGoogleDriveShareIntent(context, uri)
+                                    context.startActivity(shareIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Не удалось создать файл: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

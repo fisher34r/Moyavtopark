@@ -22,30 +22,44 @@ class FleetRepository(
     // 1. Автопарк (ТС)
     val allVehicles: Flow<List<Vehicle>> = vehicleDao.getAllVehicles()
     suspend fun insertVehicle(vehicle: Vehicle) = vehicleDao.insertVehicle(vehicle)
+    suspend fun insertVehicles(vehicles: List<Vehicle>) = vehicleDao.insertVehicles(vehicles)
     suspend fun updateVehicle(vehicle: Vehicle) = vehicleDao.updateVehicle(vehicle)
+    suspend fun updateVehicles(vehicles: List<Vehicle>) = vehicleDao.updateVehicles(vehicles)
     suspend fun deleteVehicle(vehicle: Vehicle) = vehicleDao.deleteVehicle(vehicle)
+    suspend fun deleteVehiclesByIds(ids: List<Long>) = vehicleDao.deleteVehiclesByIds(ids)
+    suspend fun deleteAllVehicles() = vehicleDao.deleteAllVehicles()
 
     // 2. Водители
     val allDrivers: Flow<List<Driver>> = driverDao.getAllDrivers()
     suspend fun insertDriver(driver: Driver) = driverDao.insertDriver(driver)
+    suspend fun insertDrivers(drivers: List<Driver>) = driverDao.insertDrivers(drivers)
     suspend fun updateDriver(driver: Driver) = driverDao.updateDriver(driver)
+    suspend fun updateDrivers(drivers: List<Driver>) = driverDao.updateDrivers(drivers)
     suspend fun deleteDriver(driver: Driver) = driverDao.deleteDriver(driver)
+    suspend fun deleteDriversByIds(ids: List<Long>) = driverDao.deleteDriversByIds(ids)
+    suspend fun deleteAllDrivers() = driverDao.deleteAllDrivers()
 
     // 3. Сервис и ТО
     val allServiceRecords: Flow<List<ServiceRecord>> = serviceDao.getAllServiceRecords()
     suspend fun insertServiceRecord(record: ServiceRecord) = serviceDao.insertServiceRecord(record)
+    suspend fun insertServiceRecords(records: List<ServiceRecord>) = serviceDao.insertServiceRecords(records)
     suspend fun updateServiceRecord(record: ServiceRecord) = serviceDao.updateServiceRecord(record)
     suspend fun deleteServiceRecord(record: ServiceRecord) = serviceDao.deleteServiceRecord(record)
+    suspend fun deleteAllServiceRecords() = serviceDao.deleteAllServiceRecords()
 
     // 4. Рейсы и путевые
     val allWaybills: Flow<List<Waybill>> = waybillDao.getAllWaybills()
     suspend fun insertWaybill(waybill: Waybill) = waybillDao.insertWaybill(waybill)
+    suspend fun insertWaybills(waybills: List<Waybill>) = waybillDao.insertWaybills(waybills)
     suspend fun updateWaybill(waybill: Waybill) = waybillDao.updateWaybill(waybill)
     suspend fun deleteWaybill(waybill: Waybill) = waybillDao.deleteWaybill(waybill)
+    suspend fun deleteAllWaybills() = waybillDao.deleteAllWaybills()
 
     // 5. Документы и сроки
     val allDocuments: Flow<List<FleetDocument>> = docDao.getAllDocuments()
     suspend fun insertDocument(doc: FleetDocument) = docDao.insertDocument(doc)
+    suspend fun insertDocuments(docs: List<FleetDocument>) = docDao.insertDocuments(docs)
     suspend fun updateDocument(doc: FleetDocument) = docDao.updateDocument(doc)
     suspend fun deleteDocument(doc: FleetDocument) = docDao.deleteDocument(doc)
+    suspend fun deleteAllDocuments() = docDao.deleteAllDocuments()
 }

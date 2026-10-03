@@ -80,6 +80,14 @@ import com.example.ui.viewmodel.FleetViewModel
 import com.example.util.Formatters
 import java.util.Locale
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.runtime.mutableStateListOf
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FleetDriversTab(
     viewModel: FleetViewModel,
@@ -98,54 +106,152 @@ fun FleetDriversTab(
     var driverToDelete by remember { mutableStateOf<Driver?>(null) }
     var driverForStatement by remember { mutableStateOf<Driver?>(null) }
 
+    // Пакетное редактирование водителей
+    var isBatchMode by remember { mutableStateOf(false) }
+    val selectedDriverIds = remember { mutableStateListOf<Long>() }
+    var showBatchEditDialog by remember { mutableStateOf(false) }
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Search and Status Filters
+            // Search, Batch Action Bar, and Status Filters
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.driverSearchQuery.value = it },
-                    label = { Text("Поиск по ФИО, телефону или ВУ") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotBlank()) {
-                            IconButton(onClick = { viewModel.driverSearchQuery.value = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                if (isBatchMode) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    isBatchMode = false
+                                    selectedDriverIds.clear()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Выйти из режима выбора")
+                                }
+                                Text(
+                                    text = "Выбрано: ${selectedDriverIds.size}",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Выбрать все / Снять
+                                IconButton(onClick = {
+                                    if (selectedDriverIds.size == drivers.size) {
+                                        selectedDriverIds.clear()
+                                    } else {
+                                        selectedDriverIds.clear()
+                                        selectedDriverIds.addAll(drivers.map { it.id })
+                                    }
+                                }) {
+                                    Icon(
+                                        Icons.Default.SelectAll,
+                                        contentDescription = "Выбрать все",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+
+                                // Редактировать выбранные
+                                IconButton(
+                                    onClick = { showBatchEditDialog = true },
+                                    enabled = selectedDriverIds.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Редактировать выбранные",
+                                        tint = if (selectedDriverIds.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
+                                    )
+                                }
+
+                                // Удалить выбранные
+                                IconButton(
+                                    onClick = { showBatchDeleteConfirm = true },
+                                    enabled = selectedDriverIds.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Удалить выбранные",
+                                        tint = if (selectedDriverIds.isNotEmpty()) MaterialTheme.colorScheme.error else Color.Gray
+                                    )
+                                }
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("driver_search_input"),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilterChip(
-                        selected = selectedStatus == null,
-                        onClick = { viewModel.driverStatusFilter.value = null },
-                        label = { Text("Все водители (${drivers.size})", fontSize = 12.sp) }
-                    )
-                    DriverStatus.values().forEach { status ->
-                        FilterChip(
-                            selected = selectedStatus == status,
-                            onClick = {
-                                viewModel.driverStatusFilter.value = if (selectedStatus == status) null else status
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.driverSearchQuery.value = it },
+                            label = { Text("Поиск по ФИО, телефону или ВУ") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotBlank()) {
+                                    IconButton(onClick = { viewModel.driverSearchQuery.value = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                                    }
+                                }
                             },
-                            label = { Text(status.label, fontSize = 12.sp) }
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("driver_search_input"),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
                         )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
+                                isBatchMode = true
+                                selectedDriverIds.clear()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Checklist,
+                                contentDescription = "Пакетное редактирование",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedStatus == null,
+                            onClick = { viewModel.driverStatusFilter.value = null },
+                            label = { Text("Все водители (${drivers.size})", fontSize = 12.sp) }
+                        )
+                        DriverStatus.values().forEach { status ->
+                            FilterChip(
+                                selected = selectedStatus == status,
+                                onClick = {
+                                    viewModel.driverStatusFilter.value = if (selectedStatus == status) null else status
+                                },
+                                label = { Text(status.label, fontSize = 12.sp) }
+                            )
+                        }
                     }
                 }
             }
@@ -172,9 +278,22 @@ fun FleetDriversTab(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(drivers, key = { it.id }) { driver ->
+                        val isSelected = selectedDriverIds.contains(driver.id)
                         DriverCard(
                             driver = driver,
                             trips = trips,
+                            isSelectionMode = isBatchMode,
+                            isSelected = isSelected,
+                            onToggleSelection = {
+                                if (isSelected) selectedDriverIds.remove(driver.id)
+                                else selectedDriverIds.add(driver.id)
+                            },
+                            onLongClick = {
+                                if (!isBatchMode) {
+                                    isBatchMode = true
+                                    selectedDriverIds.add(driver.id)
+                                }
+                            },
                             onStatusChange = { newStatus ->
                                 viewModel.updateDriverStatus(driver, newStatus)
                             },
@@ -198,18 +317,20 @@ fun FleetDriversTab(
         }
 
         // Add Driver FAB
-        FloatingActionButton(
-            onClick = {
-                driverToEdit = null
-                showAddEditDialog = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .testTag("add_driver_fab"),
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Добавить водителя")
+        if (!isBatchMode) {
+            FloatingActionButton(
+                onClick = {
+                    driverToEdit = null
+                    showAddEditDialog = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .testTag("add_driver_fab"),
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Добавить водителя")
+            }
         }
     }
 
@@ -256,12 +377,64 @@ fun FleetDriversTab(
             }
         )
     }
+
+    // Batch Delete Confirmation
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Удалить выбранных водителей?") },
+            text = { Text("Вы действительно хотите удалить выбранных водителей (${selectedDriverIds.size} чел.) из базы? Это действие нельзя отменить.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.batchDeleteDrivers(selectedDriverIds.toSet())
+                        selectedDriverIds.clear()
+                        isBatchMode = false
+                        showBatchDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить (${selectedDriverIds.size})")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Batch Edit Dialog
+    if (showBatchEditDialog) {
+        BatchEditDriversDialog(
+            selectedCount = selectedDriverIds.size,
+            onDismiss = { showBatchEditDialog = false },
+            onApply = { newStatus, newSalaryPercent, newShiftSchedule ->
+                viewModel.batchUpdateDrivers(
+                    driverIds = selectedDriverIds.toSet(),
+                    newStatus = newStatus,
+                    newSalaryPercent = newSalaryPercent,
+                    newShiftSchedule = newShiftSchedule
+                )
+                selectedDriverIds.clear()
+                isBatchMode = false
+                showBatchEditDialog = false
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DriverCard(
     driver: Driver,
     trips: List<Trip> = emptyList(),
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelection: () -> Unit = {},
+    onLongClick: () -> Unit = {},
     onStatusChange: (DriverStatus) -> Unit,
     onViewStatement: () -> Unit = {},
     onEdit: () -> Unit,
@@ -292,9 +465,22 @@ fun DriverCard(
     val driverTotalSalary = driverTrips.sumOf { it.effectiveDriverSalary }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode) onToggleSelection()
+                    else onEdit()
+                },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.surface
+        ),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -304,6 +490,13 @@ fun DriverCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onToggleSelection() }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     Box(
                         modifier = Modifier
                             .size(38.dp)
@@ -939,6 +1132,158 @@ fun DriverStatementDialog(
         confirmButton = {
             Button(onClick = onDismiss) {
                 Text("Закрыть")
+            }
+        }
+    )
+}
+
+@Composable
+fun BatchEditDriversDialog(
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onApply: (newStatus: DriverStatus?, newSalaryPercent: Double?, newShiftSchedule: String?) -> Unit
+) {
+    var updateStatus by remember { mutableStateOf(false) }
+    var selectedStatus by remember { mutableStateOf(DriverStatus.AVAILABLE) }
+
+    var updateSalary by remember { mutableStateOf(false) }
+    var salaryText by remember { mutableStateOf("20") }
+
+    var updateSchedule by remember { mutableStateOf(false) }
+    var scheduleText by remember { mutableStateOf("15/15 вахта") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Пакетное редактирование водителей ($selectedCount)") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Выберите параметры, которые нужно применить ко всем отмеченным водителям:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // 1. Статус водителя
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (updateStatus) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(checked = updateStatus, onCheckedChange = { updateStatus = it })
+                            Text("Изменить статус водителя", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        if (updateStatus) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                DriverStatus.values().forEach { st ->
+                                    FilterChip(
+                                        selected = selectedStatus == st,
+                                        onClick = { selectedStatus = st },
+                                        label = { Text(st.label, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Ставка (% от фрахта)
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (updateSalary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(checked = updateSalary, onCheckedChange = { updateSalary = it })
+                            Text("Изменить ставку (% от фрахта)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        if (updateSalary) {
+                            OutlinedTextField(
+                                value = salaryText,
+                                onValueChange = { salaryText = it },
+                                label = { Text("Процент водителя (%)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
+                    }
+                }
+
+                // 3. График работы
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (updateSchedule) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(checked = updateSchedule, onCheckedChange = { updateSchedule = it })
+                            Text("Изменить график работы", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        if (updateSchedule) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("15/15 вахта", "20/10 вахта", "30/15 вахта", "5/2 постоянный", "Без графика").forEach { sch ->
+                                    FilterChip(
+                                        selected = scheduleText == sch,
+                                        onClick = { scheduleText = sch },
+                                        label = { Text(sch, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val salaryVal = if (updateSalary) salaryText.replace(',', '.').toDoubleOrNull() else null
+                    onApply(
+                        if (updateStatus) selectedStatus else null,
+                        salaryVal,
+                        if (updateSchedule) scheduleText else null
+                    )
+                },
+                enabled = updateStatus || updateSalary || updateSchedule
+            ) {
+                Text("Применить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
             }
         }
     )

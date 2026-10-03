@@ -1,5 +1,6 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -87,8 +89,23 @@ class TripViewModel(
         }
     }
 
-    fun getBackupJson(): String {
-        return BackupService.createBackupJson(allTrips.value, settings)
+    suspend fun getBackupJson(): String {
+        val tripsList = allTrips.value
+        val vehiclesList = fleetRepository?.allVehicles?.firstOrNull() ?: emptyList()
+        val driversList = fleetRepository?.allDrivers?.firstOrNull() ?: emptyList()
+        val serviceList = fleetRepository?.allServiceRecords?.firstOrNull() ?: emptyList()
+        val waybillsList = fleetRepository?.allWaybills?.firstOrNull() ?: emptyList()
+        val docsList = fleetRepository?.allDocuments?.firstOrNull() ?: emptyList()
+
+        return BackupService.createBackupJson(
+            trips = tripsList,
+            settings = settings,
+            vehicles = vehiclesList,
+            drivers = driversList,
+            serviceRecords = serviceList,
+            waybills = waybillsList,
+            documents = docsList
+        )
     }
 
     fun exportBackupToStream(outputStream: OutputStream, onComplete: () -> Unit = {}) {
@@ -101,6 +118,26 @@ class TripViewModel(
         }
     }
 
+    suspend fun getShareableBackupUri(context: Context): android.net.Uri {
+        val tripsList = allTrips.value
+        val vehiclesList = fleetRepository?.allVehicles?.firstOrNull() ?: emptyList()
+        val driversList = fleetRepository?.allDrivers?.firstOrNull() ?: emptyList()
+        val serviceList = fleetRepository?.allServiceRecords?.firstOrNull() ?: emptyList()
+        val waybillsList = fleetRepository?.allWaybills?.firstOrNull() ?: emptyList()
+        val docsList = fleetRepository?.allDocuments?.firstOrNull() ?: emptyList()
+
+        return BackupService.createShareableBackupUri(
+            context = context,
+            trips = tripsList,
+            settings = settings,
+            vehicles = vehiclesList,
+            drivers = driversList,
+            serviceRecords = serviceList,
+            waybills = waybillsList,
+            documents = docsList
+        )
+    }
+
     fun restoreBackupFromStream(
         inputStream: InputStream,
         replaceExisting: Boolean,
@@ -111,11 +148,11 @@ class TripViewModel(
                 BackupService.readBackupFromStream(inputStream)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    onResult(RestoreResult(false, 0, "Не удалось прочитать файл: ${e.message}"))
+                    onResult(RestoreResult(false, 0, 0, 0, "Не удалось прочитать файл: ${e.message}"))
                 }
                 return@launch
             }
-            val result = BackupService.restoreFromJson(json, repository, replaceExisting)
+            val result = BackupService.restoreFromJson(json, repository, fleetRepository, replaceExisting)
             withContext(Dispatchers.Main) {
                 onResult(result)
             }

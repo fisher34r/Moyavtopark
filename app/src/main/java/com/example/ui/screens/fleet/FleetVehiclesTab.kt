@@ -75,6 +75,15 @@ import com.example.ui.viewmodel.FleetViewModel
 import com.example.util.Formatters
 import java.util.Locale
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableStateListOf
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FleetVehiclesTab(
     viewModel: FleetViewModel,
@@ -90,32 +99,130 @@ fun FleetVehiclesTab(
     var vehicleToEdit by remember { mutableStateOf<Vehicle?>(null) }
     var vehicleToDelete by remember { mutableStateOf<Vehicle?>(null) }
 
+    // Пакетное редактирование
+    var isBatchMode by remember { mutableStateOf(false) }
+    val selectedVehicleIds = remember { mutableStateListOf<Long>() }
+    var showBatchEditDialog by remember { mutableStateOf(false) }
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Search and Filters
+            // Search and Batch Action Bar
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.vehicleSearchQuery.value = it },
-                    label = { Text("Поиск по госномеру, марке, VIN или водителю") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotBlank()) {
-                            IconButton(onClick = { viewModel.vehicleSearchQuery.value = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                if (isBatchMode) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    isBatchMode = false
+                                    selectedVehicleIds.clear()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Выйти из режима выбора")
+                                }
+                                Text(
+                                    text = "Выбрано: ${selectedVehicleIds.size}",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Выбрать все / Снять
+                                IconButton(onClick = {
+                                    if (selectedVehicleIds.size == vehicles.size) {
+                                        selectedVehicleIds.clear()
+                                    } else {
+                                        selectedVehicleIds.clear()
+                                        selectedVehicleIds.addAll(vehicles.map { it.id })
+                                    }
+                                }) {
+                                    Icon(
+                                        Icons.Default.SelectAll,
+                                        contentDescription = "Выбрать все",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+
+                                // Редактировать выбранные
+                                IconButton(
+                                    onClick = { showBatchEditDialog = true },
+                                    enabled = selectedVehicleIds.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Редактировать выбранные",
+                                        tint = if (selectedVehicleIds.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
+                                    )
+                                }
+
+                                // Удалить выбранные
+                                IconButton(
+                                    onClick = { showBatchDeleteConfirm = true },
+                                    enabled = selectedVehicleIds.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Удалить выбранные",
+                                        tint = if (selectedVehicleIds.isNotEmpty()) MaterialTheme.colorScheme.error else Color.Gray
+                                    )
+                                }
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("vehicle_search_input"),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.vehicleSearchQuery.value = it },
+                            label = { Text("Поиск по госномеру, марке, VIN или водителю") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotBlank()) {
+                                    IconButton(onClick = { viewModel.vehicleSearchQuery.value = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("vehicle_search_input"),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
+                                isBatchMode = true
+                                selectedVehicleIds.clear()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Checklist,
+                                contentDescription = "Пакетное редактирование",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
 
             // Vehicles List
@@ -140,8 +247,21 @@ fun FleetVehiclesTab(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(vehicles, key = { it.id }) { vehicle ->
+                        val isSelected = selectedVehicleIds.contains(vehicle.id)
                         VehicleCard(
                             vehicle = vehicle,
+                            isSelectionMode = isBatchMode,
+                            isSelected = isSelected,
+                            onToggleSelection = {
+                                if (isSelected) selectedVehicleIds.remove(vehicle.id)
+                                else selectedVehicleIds.add(vehicle.id)
+                            },
+                            onLongClick = {
+                                if (!isBatchMode) {
+                                    isBatchMode = true
+                                    selectedVehicleIds.add(vehicle.id)
+                                }
+                            },
                             onEdit = {
                                 vehicleToEdit = vehicle
                                 showAddEditDialog = true
@@ -159,18 +279,20 @@ fun FleetVehiclesTab(
         }
 
         // Add Vehicle FAB
-        FloatingActionButton(
-            onClick = {
-                vehicleToEdit = null
-                showAddEditDialog = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .testTag("add_vehicle_fab"),
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Добавить ТС")
+        if (!isBatchMode) {
+            FloatingActionButton(
+                onClick = {
+                    vehicleToEdit = null
+                    showAddEditDialog = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .testTag("add_vehicle_fab"),
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Добавить ТС")
+            }
         }
     }
 
@@ -187,7 +309,7 @@ fun FleetVehiclesTab(
         )
     }
 
-    // Delete Confirmation Dialog
+    // Single Delete Confirmation Dialog
     vehicleToDelete?.let { v ->
         AlertDialog(
             onDismissRequest = { vehicleToDelete = null },
@@ -211,11 +333,63 @@ fun FleetVehiclesTab(
             }
         )
     }
+
+    // Batch Delete Confirmation Dialog
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Удалить выбранные ТС?") },
+            text = { Text("Вы действительно хотите удалить выбранные ТС (${selectedVehicleIds.size} шт.) из автопарка? Это действие необратимо.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.batchDeleteVehicles(selectedVehicleIds.toSet())
+                        selectedVehicleIds.clear()
+                        isBatchMode = false
+                        showBatchDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить (${selectedVehicleIds.size})")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Batch Edit Dialog
+    if (showBatchEditDialog) {
+        BatchEditVehiclesDialog(
+            selectedCount = selectedVehicleIds.size,
+            drivers = allDrivers,
+            onDismiss = { showBatchEditDialog = false },
+            onApply = { newStatus, newDriverName ->
+                viewModel.batchUpdateVehicles(
+                    vehicleIds = selectedVehicleIds.toSet(),
+                    newStatus = newStatus,
+                    newAssignedDriverName = newDriverName
+                )
+                selectedVehicleIds.clear()
+                isBatchMode = false
+                showBatchEditDialog = false
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VehicleCard(
     vehicle: Vehicle,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelection: () -> Unit = {},
+    onLongClick: () -> Unit = {},
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onNavigateToTrips: (() -> Unit)? = null,
@@ -230,9 +404,22 @@ fun VehicleCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode) onToggleSelection()
+                    else onEdit()
+                },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.surface
+        ),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -242,6 +429,13 @@ fun VehicleCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onToggleSelection() }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -619,6 +813,150 @@ fun VehicleAddEditDialog(
                 }
             ) {
                 Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BatchEditVehiclesDialog(
+    selectedCount: Int,
+    drivers: List<Driver>,
+    onDismiss: () -> Unit,
+    onApply: (newStatus: VehicleStatus?, newDriverName: String?) -> Unit
+) {
+    var updateStatus by remember { mutableStateOf(false) }
+    var selectedStatus by remember { mutableStateOf(VehicleStatus.AVAILABLE) }
+
+    var updateDriver by remember { mutableStateOf(false) }
+    var selectedDriverName by remember { mutableStateOf("") }
+    var driverDropdownExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Пакетное редактирование ТС ($selectedCount)") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Выберите параметры, которые нужно применить ко всем отмеченным ТС:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // 1. Статус ТС
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (updateStatus) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(checked = updateStatus, onCheckedChange = { updateStatus = it })
+                            Text("Изменить статус ТС", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        if (updateStatus) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                VehicleStatus.values().forEach { st ->
+                                    FilterChip(
+                                        selected = selectedStatus == st,
+                                        onClick = { selectedStatus = st },
+                                        label = { Text(st.label, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Закрепленный водитель
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (updateDriver) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(checked = updateDriver, onCheckedChange = { updateDriver = it })
+                            Text("Назначить / снять водителя", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                        if (updateDriver) {
+                            ExposedDropdownMenuBox(
+                                expanded = driverDropdownExpanded,
+                                onExpandedChange = { driverDropdownExpanded = !driverDropdownExpanded },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = if (selectedDriverName.isBlank()) "— Без водителя (снять) —" else selectedDriverName,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Водитель") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = driverDropdownExpanded) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = driverDropdownExpanded,
+                                    onDismissRequest = { driverDropdownExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("— Без водителя (снять закрепление) —", color = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            selectedDriverName = ""
+                                            driverDropdownExpanded = false
+                                        }
+                                    )
+                                    drivers.forEach { d ->
+                                        DropdownMenuItem(
+                                            text = { Text(d.fullName) },
+                                            onClick = {
+                                                selectedDriverName = d.fullName
+                                                driverDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onApply(
+                        if (updateStatus) selectedStatus else null,
+                        if (updateDriver) selectedDriverName else null
+                    )
+                },
+                enabled = updateStatus || updateDriver
+            ) {
+                Text("Применить")
             }
         },
         dismissButton = {

@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Settings
@@ -36,6 +38,7 @@ import com.example.data.local.SettingsPreferences
 import com.example.data.model.Trip
 import com.example.data.repository.FleetRepository
 import com.example.data.repository.TripRepository
+import com.example.ui.screens.CostCalculatorScreen
 import com.example.ui.screens.TripDetailScreen
 import com.example.ui.screens.TripEditScreen
 import com.example.ui.screens.TripListScreen
@@ -51,6 +54,7 @@ import com.example.ui.viewmodel.TripViewModelFactory
 sealed class NavigationDestination {
     object TripList : NavigationDestination()
     object Fleet : NavigationDestination()
+    object CostCalculator : NavigationDestination()
     object TripReports : NavigationDestination()
     object TripSettings : NavigationDestination()
     data class TripDetail(val trip: Trip) : NavigationDestination()
@@ -106,6 +110,7 @@ class MainActivity : ComponentActivity() {
 
                 val showBottomBar = currentDestination is NavigationDestination.TripList ||
                         currentDestination is NavigationDestination.Fleet ||
+                        currentDestination is NavigationDestination.CostCalculator ||
                         currentDestination is NavigationDestination.TripReports ||
                         currentDestination is NavigationDestination.TripSettings
 
@@ -140,6 +145,20 @@ class MainActivity : ComponentActivity() {
                                     },
                                     label = { Text("Автопарк") },
                                     modifier = Modifier.testTag("nav_tab_fleet")
+                                )
+
+                                NavigationBarItem(
+                                    selected = currentDestination is NavigationDestination.CostCalculator,
+                                    onClick = { currentDestination = NavigationDestination.CostCalculator },
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (currentDestination is NavigationDestination.CostCalculator)
+                                                Icons.Filled.Calculate else Icons.Outlined.Calculate,
+                                            contentDescription = "Расчёт"
+                                        )
+                                    },
+                                    label = { Text("Расчёт") },
+                                    modifier = Modifier.testTag("nav_tab_calculator")
                                 )
 
                                 NavigationBarItem(
@@ -212,6 +231,13 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToReports = {
                                     currentDestination = NavigationDestination.TripReports
                                 },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
+
+                        is NavigationDestination.CostCalculator -> {
+                            CostCalculatorScreen(
+                                settings = settings,
                                 modifier = Modifier.padding(innerPadding)
                             )
                         }
