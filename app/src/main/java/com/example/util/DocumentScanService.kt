@@ -135,28 +135,60 @@ class DocumentScanService(
             })
         }
 
-        // Try gemini-1.5-flash endpoint
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
-        val request = Request.Builder()
-            .url(url)
-            .post(jsonPayload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
+        val modelsToTry = listOf(
+            "gemini-2.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash"
+        )
 
-        try {
-            val response = httpClient.newCall(request).execute()
-            val responseBody = response.body?.string() ?: ""
-            if (!response.isSuccessful) {
-                Log.e(TAG, "Gemini API error code ${response.code}: $responseBody")
-                return@withContext ScanResult.Error(
-                    "Ошибка Gemini API (${response.code}): Проверьте правильность API-ключа в Настройках."
-                )
+        var lastErrorMessage = ""
+        var lastErrorCode = 0
+
+        for (modelName in modelsToTry) {
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("x-goog-api-key", apiKey)
+                .post(jsonPayload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            try {
+                val response = httpClient.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    return@withContext parseGeminiResponse(responseBody)
+                } else {
+                    lastErrorCode = response.code
+                    lastErrorMessage = responseBody
+                    Log.w(TAG, "Model $modelName returned ${response.code}: $responseBody")
+                    // If it's 404 (model not found/available for this key), try next fallback model
+                    if (response.code != 404) {
+                        break
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Request to $modelName failed: ${e.message}", e)
+                lastErrorMessage = e.localizedMessage ?: "Ошибка сети"
             }
-
-            parseGeminiResponse(responseBody)
-        } catch (e: Exception) {
-            Log.e(TAG, "Network call failed: ${e.message}", e)
-            ScanResult.Error("Ошибка связи с сервером распознавания: ${e.localizedMessage}")
         }
+
+        // If all failed, extract message from Google error json if possible
+        val detailedMessage = try {
+            val errObj = JSONObject(lastErrorMessage).optJSONObject("error")
+            errObj?.optString("message") ?: lastErrorMessage
+        } catch (_: Exception) {
+            lastErrorMessage
+        }
+
+        return@withContext ScanResult.Error(
+            if (lastErrorCode != 0) {
+                "Ошибка Gemini ($lastErrorCode): ${detailedMessage.take(120)}"
+            } else {
+                "Ошибка связи: $detailedMessage"
+            }
+        )
     }
 
     private fun parseGeminiResponse(jsonString: String): ScanResult {
