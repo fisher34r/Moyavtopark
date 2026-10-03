@@ -238,9 +238,12 @@ class MainActivity : ComponentActivity() {
                         }
 
                         is NavigationDestination.CostCalculator -> {
+                            val knownLocs by tripViewModel.knownLocations.collectAsStateWithLifecycle()
                             CostCalculatorScreen(
                                 settings = settings,
                                 routingService = routingService,
+                                locationService = tripViewModel.locationService,
+                                knownHistoryLocations = knownLocs,
                                 modifier = Modifier.padding(innerPadding)
                             )
                         }

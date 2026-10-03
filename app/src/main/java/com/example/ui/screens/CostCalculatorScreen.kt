@@ -75,6 +75,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import com.example.data.network.LocationService
+import com.example.ui.components.LocationSearchField
 import kotlinx.coroutines.launch
 import com.example.util.RouteResult
 import com.example.util.RoutingService
@@ -87,6 +92,8 @@ import kotlin.math.max
 fun CostCalculatorScreen(
     settings: SettingsPreferences,
     routingService: RoutingService? = null,
+    locationService: LocationService? = null,
+    knownHistoryLocations: List<String> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -477,27 +484,51 @@ fun CostCalculatorScreen(
                 title = "Маршрут и груз",
                 icon = Icons.Default.Route
             ) {
-                // Поиск по маршруту (Откуда - Куда)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
+                // Поиск по маршруту (Откуда - Куда) с подсказками
+                if (locationService != null) {
+                    LocationSearchField(
                         value = routeOrigin,
                         onValueChange = { routeOrigin = it },
-                        label = { Text("Откуда") },
-                        placeholder = { Text("Город / станция") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        label = "Откуда (погрузка)",
+                        placeholder = "Город / станция / элеватор",
+                        locationService = locationService,
+                        knownHistoryLocations = knownHistoryLocations,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "calc_route_origin"
                     )
-                    OutlinedTextField(
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LocationSearchField(
                         value = routeDestination,
                         onValueChange = { routeDestination = it },
-                        label = { Text("Куда") },
-                        placeholder = { Text("Порт / город") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        label = "Куда (выгрузка)",
+                        placeholder = "Порт / город / завод",
+                        locationService = locationService,
+                        knownHistoryLocations = knownHistoryLocations,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "calc_route_destination"
                     )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SelectOnFocusTextField(
+                            value = routeOrigin,
+                            onValueChange = { routeOrigin = it },
+                            label = { Text("Откуда") },
+                            placeholder = { Text("Город / станция") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        SelectOnFocusTextField(
+                            value = routeDestination,
+                            onValueChange = { routeDestination = it },
+                            label = { Text("Куда") },
+                            placeholder = { Text("Порт / город") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
                 }
 
                 if (routeOrigin.isNotBlank() && routeDestination.isNotBlank()) {
@@ -545,7 +576,7 @@ fun CostCalculatorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = loadedDistText,
                         onValueChange = { loadedDistText = it },
                         label = { Text("С грузом (км)") },
@@ -555,7 +586,7 @@ fun CostCalculatorScreen(
                             .testTag("calc_input_loaded_km"),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = emptyDistText,
                         onValueChange = { emptyDistText = it },
                         label = { Text("Порожний (км)") },
@@ -592,7 +623,7 @@ fun CostCalculatorScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
+                SelectOnFocusTextField(
                     value = weightTonsText,
                     onValueChange = { weightTonsText = it },
                     label = { Text("Вес груза (тонн)") },
@@ -613,7 +644,7 @@ fun CostCalculatorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = fuelRateText,
                         onValueChange = { fuelRateText = it },
                         label = { Text("Расход (л / 100 км)") },
@@ -623,7 +654,7 @@ fun CostCalculatorScreen(
                             .testTag("calc_input_fuel_rate"),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = fuelPriceText,
                         onValueChange = { fuelPriceText = it },
                         label = { Text("Цена за 1 л (₽)") },
@@ -676,7 +707,7 @@ fun CostCalculatorScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (driverPayMode == "PER_KM") {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = driverRatePerKmText,
                         onValueChange = { driverRatePerKmText = it },
                         label = { Text("Ставка водителя (₽ за км)") },
@@ -687,7 +718,7 @@ fun CostCalculatorScreen(
                         singleLine = true
                     )
                 } else {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = driverSalaryPercentText,
                         onValueChange = { driverSalaryPercentText = it },
                         label = { Text("Процент водителя от фрахта (%)") },
@@ -705,7 +736,7 @@ fun CostCalculatorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = driverPerDiemText,
                         onValueChange = { driverPerDiemText = it },
                         label = { Text("Суточные (₽/сутки)") },
@@ -715,7 +746,7 @@ fun CostCalculatorScreen(
                             .testTag("calc_input_per_diem"),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = tripDaysText,
                         onValueChange = { tripDaysText = it },
                         label = { Text("Дней") },
@@ -745,7 +776,7 @@ fun CostCalculatorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = platonRateText,
                         onValueChange = { platonRateText = it },
                         label = { Text("Платон (₽/км)") },
@@ -755,7 +786,7 @@ fun CostCalculatorScreen(
                             .testTag("calc_input_platon"),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    SelectOnFocusTextField(
                         value = tollRoadsText,
                         onValueChange = { tollRoadsText = it },
                         label = { Text("Платные дороги (₽)") },
@@ -769,7 +800,7 @@ fun CostCalculatorScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
+                SelectOnFocusTextField(
                     value = depreciationRateText,
                     onValueChange = { depreciationRateText = it },
                     label = { Text("ТО, шины и амортизация (₽/км)") },
@@ -795,7 +826,7 @@ fun CostCalculatorScreen(
                 title = "Желаемая наценка (маржа)",
                 icon = Icons.AutoMirrored.Filled.TrendingUp
             ) {
-                OutlinedTextField(
+                SelectOnFocusTextField(
                     value = marginPercentText,
                     onValueChange = { marginPercentText = it },
                     label = { Text("Желаемая рентабельность / наценка (%)") },
@@ -928,4 +959,52 @@ private fun CostBreakdownItem(
             fontWeight = FontWeight.Medium
         )
     }
+}
+
+@Composable
+fun SelectOnFocusTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    singleLine: Boolean = true
+) {
+    var textFieldValue by remember {
+        mutableStateOf(TextFieldValue(text = value, selection = TextRange(value.length)))
+    }
+    var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(value) {
+        if (value != textFieldValue.text) {
+            textFieldValue = textFieldValue.copy(
+                text = value,
+                selection = if (isFocused) TextRange(0, value.length) else TextRange(value.length)
+            )
+        }
+    }
+
+    OutlinedTextField(
+        value = textFieldValue,
+        onValueChange = { newTfv ->
+            textFieldValue = newTfv
+            onValueChange(newTfv.text)
+        },
+        modifier = modifier.onFocusChanged { focusState ->
+            val justGainedFocus = focusState.isFocused && !isFocused
+            isFocused = focusState.isFocused
+            if (justGainedFocus && textFieldValue.text.isNotEmpty()) {
+                textFieldValue = textFieldValue.copy(selection = TextRange(0, textFieldValue.text.length))
+            }
+        },
+        label = label,
+        placeholder = placeholder,
+        trailingIcon = trailingIcon,
+        leadingIcon = leadingIcon,
+        keyboardOptions = keyboardOptions,
+        singleLine = singleLine
+    )
 }

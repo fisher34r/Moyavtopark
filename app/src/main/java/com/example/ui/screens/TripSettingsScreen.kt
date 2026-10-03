@@ -303,7 +303,7 @@ fun TripSettingsScreen(
                             fuelConsumptionRate = parsedFuelRate,
                             fuelPricePerLiter = parsedFuelPrice,
                             autoCalculateFuel = autoCalculateFuel,
-                            applyToAllTrips = true
+                            applyToAllTrips = false
                         )
                         viewModel.settings.autoCalculateDistance = autoCalculateDistance
                         viewModel.settings.routeDetourPercent = detourPercent

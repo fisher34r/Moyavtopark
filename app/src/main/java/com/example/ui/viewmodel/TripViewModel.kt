@@ -179,6 +179,8 @@ class TripViewModel(
     val filterStatus = MutableStateFlow<TripStatus?>(null)
     val filterCargo = MutableStateFlow<String?>(null)
     val filterPeriod = MutableStateFlow(TripListPeriod.ALL)
+    val customDateStart = MutableStateFlow<Long?>(null)
+    val customDateEnd = MutableStateFlow<Long?>(null)
     val filterDriver = MutableStateFlow<String?>(null)
     val filterTruck = MutableStateFlow<String?>(null)
     val sortOrder = MutableStateFlow(TripSortOrder.DATE_DESC)
@@ -240,6 +242,8 @@ class TripViewModel(
 
     private data class FilterState2(
         val period: TripListPeriod,
+        val customStart: Long?,
+        val customEnd: Long?,
         val driver: String?,
         val truck: String?,
         val sort: TripSortOrder
@@ -249,8 +253,13 @@ class TripViewModel(
         combine(allTrips, searchQuery, filterStatus, filterCargo) { trips, query, status, cargo ->
             FilterState1(trips, query, status, cargo)
         },
-        combine(filterPeriod, filterDriver, filterTruck, sortOrder) { period, driver, truck, sort ->
-            FilterState2(period, driver, truck, sort)
+        combine(
+            combine(filterPeriod, customDateStart, customDateEnd) { period, start, end -> Triple(period, start, end) },
+            filterDriver,
+            filterTruck,
+            sortOrder
+        ) { periodInfo, driver, truck, sort ->
+            FilterState2(periodInfo.first, periodInfo.second, periodInfo.third, driver, truck, sort)
         }
     ) { f1, f2 ->
         val now = System.currentTimeMillis()
@@ -285,6 +294,11 @@ class TripViewModel(
                 }
                 TripListPeriod.WEEK -> trip.loadingDate >= (now - 7L * oneDay)
                 TripListPeriod.MONTH -> trip.loadingDate >= (now - 30L * oneDay)
+                TripListPeriod.CUSTOM -> {
+                    val startMatches = f2.customStart == null || trip.loadingDate >= f2.customStart
+                    val endMatches = f2.customEnd == null || trip.loadingDate <= f2.customEnd
+                    startMatches && endMatches
+                }
             }
 
             matchesQuery && matchesStatus && matchesCargo && matchesDriver && matchesTruck && matchesPeriod
@@ -430,6 +444,12 @@ class TripViewModel(
         filterPeriod.value = period
     }
 
+    fun setCustomPeriod(start: Long?, end: Long?) {
+        customDateStart.value = start
+        customDateEnd.value = end
+        filterPeriod.value = TripListPeriod.CUSTOM
+    }
+
     fun setFilterDriver(driver: String?) {
         filterDriver.value = driver
     }
@@ -447,6 +467,8 @@ class TripViewModel(
         filterStatus.value = null
         filterCargo.value = null
         filterPeriod.value = TripListPeriod.ALL
+        customDateStart.value = null
+        customDateEnd.value = null
         filterDriver.value = null
         filterTruck.value = null
         sortOrder.value = TripSortOrder.DATE_DESC
@@ -555,7 +577,7 @@ class TripViewModel(
         fuelConsumptionRate: Double,
         fuelPricePerLiter: Double,
         autoCalculateFuel: Boolean,
-        applyToAllTrips: Boolean = true
+        applyToAllTrips: Boolean = false
     ) {
         settings.defaultFuelConsumptionRate = fuelConsumptionRate
         settings.defaultFuelPricePerLiter = fuelPricePerLiter
@@ -657,7 +679,8 @@ enum class TripListPeriod(val label: String) {
     ALL("Все время"),
     TODAY("Сегодня"),
     WEEK("7 дней"),
-    MONTH("Этот месяц")
+    MONTH("Этот месяц"),
+    CUSTOM("Свой период")
 }
 
 enum class TripSortOrder(val label: String) {

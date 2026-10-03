@@ -73,6 +73,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,6 +166,8 @@ fun TripEditScreen(
         } else 280.0
         mutableStateOf(String.format(Locale.US, "%.0f", initialDist))
     }
+    var isRoundTrip by remember { mutableStateOf(false) }
+    var baseOneWayDistance by remember { mutableDoubleStateOf(0.0) }
 
     var selectedRateType by remember {
         mutableStateOf(tripToEdit?.rateType ?: rememberedData.rateType)
@@ -618,6 +621,53 @@ fun TripEditScreen(
                         )
                     }
 
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilterChip(
+                            selected = isRoundTrip,
+                            onClick = {
+                                val currentDist = distanceText.replace(',', '.').toDoubleOrNull() ?: 0.0
+                                if (!isRoundTrip) {
+                                    if (currentDist > 0) {
+                                        baseOneWayDistance = currentDist
+                                        val doubled = currentDist * 2.0
+                                        distanceText = if (doubled % 1.0 == 0.0) String.format(Locale.US, "%.0f", doubled) else String.format(Locale.US, "%.1f", doubled)
+                                        if (viewModel.settings.autoCalculateFuel && parsedFuelRate > 0) {
+                                            val liters = (doubled / 100.0) * parsedFuelRate
+                                            fuelLitersText = String.format(Locale.US, "%.1f", liters)
+                                            fuelExpensesText = String.format(Locale.US, "%.0f", liters * parsedFuelPrice)
+                                        }
+                                    }
+                                    isRoundTrip = true
+                                } else {
+                                    val oneWay = if (baseOneWayDistance > 0) baseOneWayDistance else (currentDist / 2.0)
+                                    if (oneWay > 0) {
+                                        distanceText = if (oneWay % 1.0 == 0.0) String.format(Locale.US, "%.0f", oneWay) else String.format(Locale.US, "%.1f", oneWay)
+                                        if (viewModel.settings.autoCalculateFuel && parsedFuelRate > 0) {
+                                            val liters = (oneWay / 100.0) * parsedFuelRate
+                                            fuelLitersText = String.format(Locale.US, "%.1f", liters)
+                                            fuelExpensesText = String.format(Locale.US, "%.0f", liters * parsedFuelPrice)
+                                        }
+                                    }
+                                    isRoundTrip = false
+                                }
+                            },
+                            label = { Text("Кругорейс (×2)", fontSize = 12.sp) },
+                            leadingIcon = if (isRoundTrip) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
@@ -958,7 +1008,10 @@ fun TripEditScreen(
                                 coroutineScope.launch {
                                     when (val res = viewModel.calculateDistance(loadingLocation, unloadingLocation)) {
                                         is RouteResult.Success -> {
-                                            val rounded = Math.round(res.distanceKm).toInt()
+                                            val rawDist = res.distanceKm
+                                            baseOneWayDistance = rawDist
+                                            val effectiveKm = if (isRoundTrip) rawDist * 2.0 else rawDist
+                                            val rounded = Math.round(effectiveKm).toInt()
                                             distanceText = rounded.toString()
                                             val newDist = rounded.toDouble()
                                             if (viewModel.settings.autoCalculateFuel && newDist > 0 && parsedFuelRate > 0) {
@@ -968,8 +1021,9 @@ fun TripEditScreen(
                                                 fuelExpensesText = String.format(Locale.US, "%.0f", cost)
                                             }
                                             val src = if (res.fromCache) "из кэша" else res.provider
-                                            routeCalculationNote = "${res.distanceKm} км ($src)"
-                                            Toast.makeText(context, "Рассчитано: ${res.distanceKm} км ($src)", Toast.LENGTH_SHORT).show()
+                                            val roundTripNote = if (isRoundTrip) " (кругорейс ×2 = $rounded км)" else ""
+                                            routeCalculationNote = "${res.distanceKm} км в 1 сторону$roundTripNote ($src)"
+                                            Toast.makeText(context, "Рассчитано: $rounded км ($src)", Toast.LENGTH_SHORT).show()
                                         }
                                         is RouteResult.Error -> {
                                             routeCalculationNote = "Ошибка: ${res.message}"

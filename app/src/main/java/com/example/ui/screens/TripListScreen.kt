@@ -73,18 +73,24 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import android.app.DatePickerDialog
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -127,6 +133,59 @@ fun TripListScreen(
     val registeredDrivers by viewModel.registeredDrivers.collectAsStateWithLifecycle()
     val registeredVehicles by viewModel.registeredVehicles.collectAsStateWithLifecycle()
 
+    val customDateStart by viewModel.customDateStart.collectAsStateWithLifecycle()
+    val customDateEnd by viewModel.customDateEnd.collectAsStateWithLifecycle()
+
+    val dateFormatter = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    val showCustomStartDatePicker = {
+        val cal = Calendar.getInstance().apply {
+            customDateStart?.let { timeInMillis = it }
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val newCal = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                viewModel.setCustomPeriod(newCal.timeInMillis, customDateEnd)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    val showCustomEndDatePicker = {
+        val cal = Calendar.getInstance().apply {
+            customDateEnd?.let { timeInMillis = it }
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val newCal = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                viewModel.setCustomPeriod(customDateStart, newCal.timeInMillis)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
     var isFilterSpoilerExpanded by remember { mutableStateOf(false) }
@@ -137,6 +196,26 @@ fun TripListScreen(
     val selectedTripIds = remember { mutableStateListOf<Long>() }
     var showBatchEditDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+
+    val currentMonthKey = remember {
+        SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(System.currentTimeMillis())
+    }
+    val monthTitleFormatter = remember {
+        SimpleDateFormat("LLLL yyyy", Locale.forLanguageTag("ru"))
+    }
+    val monthKeyFormatter = remember {
+        SimpleDateFormat("yyyy-MM", Locale.getDefault())
+    }
+
+    var expandedMonths by rememberSaveable {
+        mutableStateOf(setOf(currentMonthKey))
+    }
+
+    val groupedTrips = remember(trips) {
+        trips.groupBy { trip ->
+            monthKeyFormatter.format(trip.loadingDate)
+        }
+    }
 
     // Distinct crops, drivers, and trucks from actual trips for filter chips
     val availableCrops = remember(allTrips) {
@@ -192,9 +271,52 @@ fun TripListScreen(
                             TripListPeriod.values().forEach { period ->
                                 FilterChip(
                                     selected = currentFilterPeriod == period,
-                                    onClick = { viewModel.setFilterPeriod(period) },
+                                    onClick = {
+                                        if (period == TripListPeriod.CUSTOM) {
+                                            viewModel.setFilterPeriod(TripListPeriod.CUSTOM)
+                                            if (customDateStart == null) {
+                                                showCustomStartDatePicker()
+                                            }
+                                        } else {
+                                            viewModel.setFilterPeriod(period)
+                                        }
+                                    },
                                     label = { Text(period.label) }
                                 )
+                            }
+                        }
+
+                        if (currentFilterPeriod == TripListPeriod.CUSTOM) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showCustomStartDatePicker() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = customDateStart?.let { "С: " + dateFormatter.format(it) } ?: "Дата С",
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { showCustomEndDatePicker() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = customDateEnd?.let { "По: " + dateFormatter.format(it) } ?: "Дата По",
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -697,27 +819,123 @@ fun TripListScreen(
                     }
                 }
             } else {
-                // Trip Cards List
-                items(
-                    items = trips,
-                    key = { it.id }
-                ) { trip ->
-                    TripCard(
-                        trip = trip,
-                        isSelectionMode = isBatchMode,
-                        isSelected = trip.id in selectedTripIds,
-                        onToggleSelect = {
-                            if (trip.id in selectedTripIds) {
-                                selectedTripIds.remove(trip.id)
-                            } else {
-                                selectedTripIds.add(trip.id)
+                // Trip Cards List grouped by Month
+                groupedTrips.forEach { (monthKey, monthTrips) ->
+                    val isExpanded = monthKey in expandedMonths
+                    val firstTripDate = monthTrips.firstOrNull()?.loadingDate ?: System.currentTimeMillis()
+                    val rawMonthTitle = monthTitleFormatter.format(firstTripDate)
+                    val monthTitle = rawMonthTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.forLanguageTag("ru")) else it.toString() }
+                    val totalTons = monthTrips.sumOf { it.weightTons }
+                    val totalPrice = monthTrips.sumOf { it.totalPrice }
+
+                    item(key = "header_$monthKey") {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    expandedMonths = if (isExpanded) {
+                                        expandedMonths - monthKey
+                                    } else {
+                                        expandedMonths + monthKey
+                                    }
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (monthKey == currentMonthKey) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                }
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = monthTitle,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = "${monthTrips.size}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "%.1f т • %,d ₽".format(Locale.getDefault(), totalTons, totalPrice.toLong()),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        expandedMonths = if (isExpanded) {
+                                            expandedMonths - monthKey
+                                        } else {
+                                            expandedMonths + monthKey
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                        },
-                        onClick = { onTripClick(trip) },
-                        onStatusChange = { newStatus ->
-                            viewModel.updateTripStatus(trip, newStatus)
                         }
-                    )
+                    }
+
+                    if (isExpanded) {
+                        items(
+                            items = monthTrips,
+                            key = { it.id }
+                        ) { trip ->
+                            TripCard(
+                                trip = trip,
+                                isSelectionMode = isBatchMode,
+                                isSelected = trip.id in selectedTripIds,
+                                onToggleSelect = {
+                                    if (trip.id in selectedTripIds) {
+                                        selectedTripIds.remove(trip.id)
+                                    } else {
+                                        selectedTripIds.add(trip.id)
+                                    }
+                                },
+                                onClick = { onTripClick(trip) },
+                                onStatusChange = { newStatus ->
+                                    viewModel.updateTripStatus(trip, newStatus)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
