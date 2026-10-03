@@ -15,6 +15,8 @@ import com.example.data.model.TripStatus
 import com.example.data.network.LocationService
 import com.example.data.repository.FleetRepository
 import com.example.data.repository.TripRepository
+import com.example.util.RouteResult
+import com.example.util.RoutingService
 import com.example.util.TripNumberUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,11 +67,25 @@ data class RememberedTripData(
 
 class TripViewModel(
     private val repository: TripRepository,
-    private val fleetRepository: FleetRepository? = null
+    private val fleetRepository: FleetRepository? = null,
+    val routingService: RoutingService? = null
 ) : ViewModel() {
 
     val settings: SettingsPreferences = repository.settingsPreferences
     val locationService = LocationService()
+
+    suspend fun calculateDistance(origin: String, destination: String, forceRefresh: Boolean = false): RouteResult {
+        return routingService?.calculateDistance(origin, destination, forceRefresh)
+            ?: RouteResult.Error("Сервис маршрутизации не инициализирован")
+    }
+
+    suspend fun clearRouteCache() {
+        routingService?.clearCache()
+    }
+
+    suspend fun getRouteCacheCount(): Int {
+        return routingService?.getCachedRoutesCount() ?: 0
+    }
 
     val registeredDrivers: StateFlow<List<Driver>> = (fleetRepository?.allDrivers ?: flowOf(emptyList()))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -625,12 +641,13 @@ class TripViewModel(
 
 class TripViewModelFactory(
     private val repository: TripRepository,
-    private val fleetRepository: FleetRepository? = null
+    private val fleetRepository: FleetRepository? = null,
+    private val routingService: RoutingService? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TripViewModel::class.java)) {
-            return TripViewModel(repository, fleetRepository) as T
+            return TripViewModel(repository, fleetRepository, routingService) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

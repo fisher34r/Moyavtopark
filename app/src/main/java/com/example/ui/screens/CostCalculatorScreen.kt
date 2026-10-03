@@ -73,6 +73,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.util.RouteResult
+import com.example.util.RoutingService
 import com.example.data.local.SettingsPreferences
 import java.util.Locale
 import kotlin.math.max
@@ -81,9 +86,15 @@ import kotlin.math.max
 @Composable
 fun CostCalculatorScreen(
     settings: SettingsPreferences,
+    routingService: RoutingService? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var routeOrigin by remember { mutableStateOf("") }
+    var routeDestination by remember { mutableStateOf("") }
+    var isCalculatingRoute by remember { mutableStateOf(false) }
 
     // State initialized from SettingsPreferences
     var loadedDistText by remember { mutableStateOf(settings.calcLoadedDistanceKm.let { if (it > 0) it.toString() else "280" }) }
@@ -466,6 +477,70 @@ fun CostCalculatorScreen(
                 title = "Маршрут и груз",
                 icon = Icons.Default.Route
             ) {
+                // Поиск по маршруту (Откуда - Куда)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = routeOrigin,
+                        onValueChange = { routeOrigin = it },
+                        label = { Text("Откуда") },
+                        placeholder = { Text("Город / станция") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = routeDestination,
+                        onValueChange = { routeDestination = it },
+                        label = { Text("Куда") },
+                        placeholder = { Text("Порт / город") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
+
+                if (routeOrigin.isNotBlank() && routeDestination.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = {
+                            isCalculatingRoute = true
+                            scope.launch {
+                                when (val res = routingService?.calculateDistance(routeOrigin, routeDestination)) {
+                                    is RouteResult.Success -> {
+                                        val dist = Math.round(res.distanceKm).toInt()
+                                        loadedDistText = dist.toString()
+                                        val src = if (res.fromCache) "из кэша" else res.provider
+                                        Toast.makeText(context, "Рассчитано: ${res.distanceKm} км ($src)", Toast.LENGTH_SHORT).show()
+                                    }
+                                    is RouteResult.Error -> {
+                                        Toast.makeText(context, res.message, Toast.LENGTH_LONG).show()
+                                    }
+                                    null -> {
+                                        Toast.makeText(context, "Сервис маршрутизации недоступен", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                isCalculatingRoute = false
+                            }
+                        },
+                        enabled = !isCalculatingRoute,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        if (isCalculatingRoute) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Расчёт дистанции...", fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.Route, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Рассчитать километраж", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)

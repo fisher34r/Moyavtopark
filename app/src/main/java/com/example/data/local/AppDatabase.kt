@@ -22,7 +22,9 @@ import com.example.data.local.fleet.FleetDocumentDao
 import com.example.data.local.fleet.ServiceRecordDao
 import com.example.data.local.fleet.VehicleDao
 import com.example.data.local.fleet.WaybillDao
+import androidx.room.migration.Migration
 import com.example.data.model.RateType
+import com.example.data.model.RouteCacheEntity
 import com.example.data.model.Trip
 import com.example.data.model.TripStatus
 import kotlinx.coroutines.CoroutineScope
@@ -36,9 +38,10 @@ import kotlinx.coroutines.launch
         Driver::class,
         ServiceRecord::class,
         Waybill::class,
-        FleetDocument::class
+        FleetDocument::class,
+        RouteCacheEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -49,10 +52,31 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun serviceRecordDao(): ServiceRecordDao
     abstract fun waybillDao(): WaybillDao
     abstract fun fleetDocumentDao(): FleetDocumentDao
+    abstract fun routeCacheDao(): RouteCacheDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `route_cache` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `originNormalized` TEXT NOT NULL,
+                        `destinationNormalized` TEXT NOT NULL,
+                        `distanceKm` REAL NOT NULL,
+                        `provider` TEXT NOT NULL,
+                        `cachedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_route_cache_originNormalized_destinationNormalized` ON `route_cache` (`originNormalized`, `destinationNormalized`)"
+                )
+            }
+        }
 
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -62,6 +86,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "grain_truck_database"
                 )
+                .addMigrations(MIGRATION_4_5)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .addCallback(DatabaseCallback(scope) { createdInstance ?: INSTANCE })
                 .build()

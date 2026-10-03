@@ -212,6 +212,18 @@ class SettingsPreferences(context: Context) {
         get() = prefs.getFloat("calc_margin_percent", 20.0f).toDouble()
         set(value) = prefs.edit().putFloat("calc_margin_percent", value.toFloat()).apply()
 
+    var yandexApiKey: String
+        get() = prefs.getString("yandex_api_key", "") ?: ""
+        set(value) = prefs.edit().putString("yandex_api_key", value).apply()
+
+    var routeDetourPercent: Double
+        get() = prefs.getFloat("route_detour_percent", 5.0f).toDouble()
+        set(value) = prefs.edit().putFloat("route_detour_percent", value.toFloat()).apply()
+
+    var autoCalculateDistance: Boolean
+        get() = prefs.getBoolean("auto_calculate_distance", true)
+        set(value) = prefs.edit().putBoolean("auto_calculate_distance", value).apply()
+
     fun saveLastTripData(trip: Trip) {
         prefs.edit()
             .putBoolean(KEY_HAS_REMEMBERED_DATA, true)

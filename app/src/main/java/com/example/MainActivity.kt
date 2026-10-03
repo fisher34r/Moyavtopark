@@ -83,8 +83,10 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            val routingService = remember { com.example.util.RoutingService(database.routeCacheDao(), settings) }
+
             val tripViewModel: TripViewModel = viewModel(
-                factory = TripViewModelFactory(repository, fleetRepository)
+                factory = TripViewModelFactory(repository, fleetRepository, routingService)
             )
             val fleetViewModel: FleetViewModel = viewModel(
                 factory = FleetViewModelFactory(fleetRepository, repository)
@@ -238,6 +240,7 @@ class MainActivity : ComponentActivity() {
                         is NavigationDestination.CostCalculator -> {
                             CostCalculatorScreen(
                                 settings = settings,
+                                routingService = routingService,
                                 modifier = Modifier.padding(innerPadding)
                             )
                         }

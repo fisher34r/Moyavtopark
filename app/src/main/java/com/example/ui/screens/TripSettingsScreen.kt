@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalShipping
@@ -51,9 +53,13 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.AppColorStyle
 import com.example.ui.theme.AppThemeMode
@@ -132,6 +138,15 @@ fun TripSettingsScreen(
 
     val parsedFuelRate = fuelConsumptionText.replace(',', '.').toDoubleOrNull() ?: 38.0
     val parsedFuelPrice = fuelPriceText.replace(',', '.').toDoubleOrNull() ?: 66.0
+
+    var autoCalculateDistance by remember { mutableStateOf(viewModel.settings.autoCalculateDistance) }
+    var detourPercent by remember { mutableDoubleStateOf(viewModel.settings.routeDetourPercent) }
+    var yandexApiKey by remember { mutableStateOf(viewModel.settings.yandexApiKey) }
+    var cachedRoutesCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        cachedRoutesCount = viewModel.getRouteCacheCount()
+    }
 
     val currentThemeMode by viewModel.currentThemeMode.collectAsStateWithLifecycle()
     val currentColorStyle by viewModel.currentColorStyle.collectAsStateWithLifecycle()
@@ -290,6 +305,9 @@ fun TripSettingsScreen(
                             autoCalculateFuel = autoCalculateFuel,
                             applyToAllTrips = true
                         )
+                        viewModel.settings.autoCalculateDistance = autoCalculateDistance
+                        viewModel.settings.routeDetourPercent = detourPercent
+                        viewModel.settings.yandexApiKey = yandexApiKey.trim()
                         Toast.makeText(context, "Настройки сохранены", Toast.LENGTH_SHORT).show()
                         onBack()
                     },
@@ -737,6 +755,145 @@ fun TripSettingsScreen(
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Обновить", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Раздел: Расчёт расстояний и маршрутизация
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Route,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Расчёт расстояний и маршрутизация",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Автоматический расчёт расстояния между пунктами погрузки и выгрузки по дорожной сети через OSRM и OpenStreetMap с локальным кэшированием.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Авторасчёт расстояния в рейсах",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Автоматически подставлять км при заполнении маршрута",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = autoCalculateDistance,
+                            onCheckedChange = { autoCalculateDistance = it },
+                            modifier = Modifier.testTag("switch_auto_distance")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Запас на объезды и маневрирование:",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(0.0 to "0%", 5.0 to "+5%", 7.0 to "+7%", 10.0 to "+10%").forEach { (value, label) ->
+                            FilterChip(
+                                selected = (detourPercent == value),
+                                onClick = { detourPercent = value },
+                                label = { Text(label, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = yandexApiKey,
+                        onValueChange = { yandexApiKey = it },
+                        label = { Text("API-ключ Яндекс (опционально)") },
+                        placeholder = { Text("Для улучшенной точности адресов в РФ") },
+                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        supportingText = {
+                            Text("Если поле пустое, бесплатно работает OSRM + OpenStreetMap без ограничений", fontSize = 11.sp)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Кэш маршрутов: $cachedRoutesCount сохраненных",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        if (cachedRoutesCount > 0) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        viewModel.clearRouteCache()
+                                        cachedRoutesCount = 0
+                                        Toast.makeText(context, "Кэш маршрутов очищен", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Очистить кэш", fontSize = 12.sp)
+                            }
                         }
                     }
                 }

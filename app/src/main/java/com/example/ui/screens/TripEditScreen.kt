@@ -40,7 +40,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
+import android.widget.Toast
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
@@ -48,6 +50,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.util.RouteResult
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -104,7 +109,10 @@ fun TripEditScreen(
     BackHandler(onBack = onBack)
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val isEditing = tripToEdit != null
+    var isCalculatingDistance by remember { mutableStateOf(false) }
+    var routeCalculationNote by remember { mutableStateOf<String?>(null) }
     val knownHistoryLocations by viewModel.knownLocations.collectAsStateWithLifecycle()
     val totalSettlementsCount by viewModel.locationService.totalSettlementsCount.collectAsStateWithLifecycle()
     val isOnlineLoading by viewModel.locationService.isLoadingOnline.collectAsStateWithLifecycle()
@@ -940,7 +948,67 @@ fun TripEditScreen(
                         testTag = "input_unloading_location"
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            if (loadingLocation.isNotBlank() && unloadingLocation.isNotBlank()) {
+                                isCalculatingDistance = true
+                                routeCalculationNote = null
+                                coroutineScope.launch {
+                                    when (val res = viewModel.calculateDistance(loadingLocation, unloadingLocation)) {
+                                        is RouteResult.Success -> {
+                                            val rounded = Math.round(res.distanceKm).toInt()
+                                            distanceText = rounded.toString()
+                                            val newDist = rounded.toDouble()
+                                            if (viewModel.settings.autoCalculateFuel && newDist > 0 && parsedFuelRate > 0) {
+                                                val liters = (newDist / 100.0) * parsedFuelRate
+                                                val cost = liters * parsedFuelPrice
+                                                fuelLitersText = String.format(Locale.US, "%.1f", liters)
+                                                fuelExpensesText = String.format(Locale.US, "%.0f", cost)
+                                            }
+                                            val src = if (res.fromCache) "из кэша" else res.provider
+                                            routeCalculationNote = "${res.distanceKm} км ($src)"
+                                            Toast.makeText(context, "Рассчитано: ${res.distanceKm} км ($src)", Toast.LENGTH_SHORT).show()
+                                        }
+                                        is RouteResult.Error -> {
+                                            routeCalculationNote = "Ошибка: ${res.message}"
+                                            Toast.makeText(context, res.message, Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                    isCalculatingDistance = false
+                                }
+                            } else {
+                                Toast.makeText(context, "Укажите погрузку и выгрузку для расчёта", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = !isCalculatingDistance && loadingLocation.isNotBlank() && unloadingLocation.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_calculate_distance"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isCalculatingDistance) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Расчёт дистанции...", fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.Route, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Рассчитать расстояние по маршруту (км)", fontSize = 12.sp)
+                        }
+                    }
+
+                    if (routeCalculationNote != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Маршрут: $routeCalculationNote",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
