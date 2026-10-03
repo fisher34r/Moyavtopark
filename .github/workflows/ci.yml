@@ -32,17 +32,26 @@ jobs:
       - name: Build debug APK
         run: ./gradlew clean assembleDebug
 
+      - name: Rename APK file
+        run: |
+          VERSION_NAME=$(grep 'versionName =' app/build.gradle.kts | head -1 | awk -F'"' '{print $2}')
+          APK_NAME="MoyAvtopark-v${VERSION_NAME}-b${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
+          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
+          echo "APP_VERSION=${VERSION_NAME}" >> $GITHUB_ENV
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: MoyAvtopark-apk
+          path: ${{ env.APK_NAME }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release ${{ github.run_number }}
+          tag_name: v${{ env.APP_VERSION }}.${{ github.run_number }}
+          name: Мой Автопарк v${{ env.APP_VERSION }} (Сборка ${{ github.run_number }})
           draft: false
           prerelease: false
-          files: app/build/outputs/apk/debug/app-debug.apk
+          body_path: RELEASE_NOTES.md
+          files: ${{ env.APK_NAME }}
