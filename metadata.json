@@ -1,0 +1,6 @@
+{
+  "name": "Зерновоз",
+  "description": "Учет рейсов зерновоза: фиксация погрузки/выгрузки, массы груза, расстояния и автоматический расчет стоимости перевозки.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
