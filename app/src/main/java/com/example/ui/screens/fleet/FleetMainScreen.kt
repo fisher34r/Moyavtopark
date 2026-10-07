@@ -1,4 +1,4 @@
-﻿package com.example.ui.screens.fleet
+package com.example.ui.screens.fleet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -89,11 +89,11 @@ fun FleetMainScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "РЈРїСЂР°РІР»РµРЅРёРµ Р°РІС‚РѕРїР°СЂРєРѕРј",
+                            text = "Управление автопарком",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "РўСЏРіР°С‡Рё вЂў РџСЂРёС†РµРїС‹ вЂў Р’РѕРґРёС‚РµР»Рё вЂў РЎРµСЂРІРёСЃ вЂў РђРЅР°Р»РёС‚РёРєР°",
+                            text = "Тягачи • Прицепы • Водители • Сервис • Аналитика",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -181,9 +181,3 @@ fun FleetMainScreen(
         }
     }
 }
-
-
-
-
-
-

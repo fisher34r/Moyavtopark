@@ -1,4 +1,4 @@
-﻿package com.example
+package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -129,10 +129,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripList)
                                                 Icons.Filled.LocalShipping else Icons.Outlined.LocalShipping,
-                                            contentDescription = "Р РµР№СЃС‹"
+                                            contentDescription = "Рейсы"
                                         )
                                     },
-                                    label = { Text("Р РµР№СЃС‹") },
+                                    label = { Text("Рейсы") },
                                     modifier = Modifier.testTag("nav_tab_trips")
                                 )
 
@@ -143,10 +143,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.Fleet)
                                                 Icons.Filled.DirectionsCar else Icons.Outlined.DirectionsCar,
-                                            contentDescription = "РђРІС‚РѕРїР°СЂРє"
+                                            contentDescription = "Автопарк"
                                         )
                                     },
-                                    label = { Text("РђРІС‚РѕРїР°СЂРє") },
+                                    label = { Text("Автопарк") },
                                     modifier = Modifier.testTag("nav_tab_fleet")
                                 )
 
@@ -157,10 +157,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.CostCalculator)
                                                 Icons.Filled.Calculate else Icons.Outlined.Calculate,
-                                            contentDescription = "Р Р°СЃС‡С‘С‚"
+                                            contentDescription = "Расчёт"
                                         )
                                     },
-                                    label = { Text("Р Р°СЃС‡С‘С‚") },
+                                    label = { Text("Расчёт") },
                                     modifier = Modifier.testTag("nav_tab_calculator")
                                 )
 
@@ -171,10 +171,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripReports)
                                                 Icons.Filled.Assessment else Icons.Outlined.Assessment,
-                                            contentDescription = "РћС‚С‡РµС‚С‹"
+                                            contentDescription = "Отчеты"
                                         )
                                     },
-                                    label = { Text("РћС‚С‡РµС‚С‹") },
+                                    label = { Text("Отчеты") },
                                     modifier = Modifier.testTag("nav_tab_reports")
                                 )
 
@@ -185,10 +185,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripSettings)
                                                 Icons.Filled.Settings else Icons.Outlined.Settings,
-                                            contentDescription = "РќР°СЃС‚СЂРѕР№РєРё"
+                                            contentDescription = "Настройки"
                                         )
                                     },
-                                    label = { Text("РќР°СЃС‚СЂРѕР№РєРё") },
+                                    label = { Text("Настройки") },
                                     modifier = Modifier.testTag("nav_tab_settings")
                                 )
                             }
@@ -319,4 +319,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
