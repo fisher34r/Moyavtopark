@@ -94,6 +94,8 @@ fun FleetVehiclesTab(
     val vehicles by viewModel.filteredVehicles.collectAsStateWithLifecycle()
     val searchQuery by viewModel.vehicleSearchQuery.collectAsStateWithLifecycle()
     val allDrivers by viewModel.drivers.collectAsStateWithLifecycle()
+    val trips by viewModel.trips.collectAsStateWithLifecycle()
+    val fuelRecords by viewModel.fuelRecords.collectAsStateWithLifecycle()
 
     var showAddEditDialog by remember { mutableStateOf(false) }
     var vehicleToEdit by remember { mutableStateOf<Vehicle?>(null) }
@@ -248,8 +250,20 @@ fun FleetVehiclesTab(
                 ) {
                     items(vehicles, key = { it.id }) { vehicle ->
                         val isSelected = selectedVehicleIds.contains(vehicle.id)
+                        val vTrips = trips.filter { it.truckPlate.equals(vehicle.plateNumber, ignoreCase = true) }
+                        val vFuels = fuelRecords.filter { it.vehiclePlate.equals(vehicle.plateNumber, ignoreCase = true) }
+                        val totalDist = vTrips.sumOf { it.distanceKm }
+                        val totalFuelLiters = vFuels.sumOf { it.liters }
+                        val avgConsumption: Double? = if (totalDist > 0 && totalFuelLiters > 0) {
+                            (totalFuelLiters / totalDist) * 100.0
+                        } else if (totalDist > 0) {
+                            val fallback = vTrips.sumOf { it.effectiveFuelLiters }
+                            if (fallback > 0) (fallback / totalDist) * 100.0 else null
+                        } else null
+
                         VehicleCard(
                             vehicle = vehicle,
+                            averageConsumption = avgConsumption,
                             isSelectionMode = isBatchMode,
                             isSelected = isSelected,
                             onToggleSelection = {
@@ -386,6 +400,7 @@ fun FleetVehiclesTab(
 @Composable
 fun VehicleCard(
     vehicle: Vehicle,
+    averageConsumption: Double? = null,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelection: () -> Unit = {},
@@ -510,18 +525,36 @@ fun VehicleCard(
 
                 // Fuel
                 if (vehicle.fuelTankCapacityLiters > 0) {
+                    val pct = ((vehicle.currentFuelLiters / vehicle.fuelTankCapacityLiters) * 100).toInt().coerceIn(0, 100)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.LocalGasStation,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (pct < 15) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Бак: ${vehicle.currentFuelLiters.toInt()}/${vehicle.fuelTankCapacityLiters.toInt()} л",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "Бак: ${vehicle.currentFuelLiters.toInt()}/${vehicle.fuelTankCapacityLiters.toInt()} л ($pct%)",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (pct < 15) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                if (averageConsumption != null && averageConsumption > 0.0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Speed,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Color(0xFF1565C0)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Ср. расход: ${String.format(Locale.US, "%.1f", averageConsumption)} л/100км",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                            color = Color(0xFF1565C0)
                         )
                     }
                 }
@@ -737,6 +770,27 @@ fun VehicleAddEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = fuelTankText,
+                        onValueChange = { fuelTankText = it },
+                        label = { Text("Объём бака (л)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = currentFuelText,
+                        onValueChange = { currentFuelText = it },
+                        label = { Text("Остаток в баке (л)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(6.dp))
 

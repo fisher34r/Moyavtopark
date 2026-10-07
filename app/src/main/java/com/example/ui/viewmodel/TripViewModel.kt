@@ -112,6 +112,7 @@ class TripViewModel(
         val serviceList = fleetRepository?.allServiceRecords?.firstOrNull() ?: emptyList()
         val waybillsList = fleetRepository?.allWaybills?.firstOrNull() ?: emptyList()
         val docsList = fleetRepository?.allDocuments?.firstOrNull() ?: emptyList()
+        val fuelList = fleetRepository?.allFuelRecords?.firstOrNull() ?: emptyList()
 
         return BackupService.createBackupJson(
             trips = tripsList,
@@ -120,7 +121,8 @@ class TripViewModel(
             drivers = driversList,
             serviceRecords = serviceList,
             waybills = waybillsList,
-            documents = docsList
+            documents = docsList,
+            fuelRecords = fuelList
         )
     }
 
@@ -141,6 +143,7 @@ class TripViewModel(
         val serviceList = fleetRepository?.allServiceRecords?.firstOrNull() ?: emptyList()
         val waybillsList = fleetRepository?.allWaybills?.firstOrNull() ?: emptyList()
         val docsList = fleetRepository?.allDocuments?.firstOrNull() ?: emptyList()
+        val fuelList = fleetRepository?.allFuelRecords?.firstOrNull() ?: emptyList()
 
         return BackupService.createShareableBackupUri(
             context = context,
@@ -150,7 +153,8 @@ class TripViewModel(
             drivers = driversList,
             serviceRecords = serviceList,
             waybills = waybillsList,
-            documents = docsList
+            documents = docsList,
+            fuelRecords = fuelList
         )
     }
 
@@ -164,7 +168,7 @@ class TripViewModel(
                 BackupService.readBackupFromStream(inputStream)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    onResult(RestoreResult(false, 0, 0, 0, "Не удалось прочитать файл: ${e.message}"))
+                    onResult(RestoreResult(false, 0, 0, 0, "Ошибка: ${e.message}"))
                 }
                 return@launch
             }
@@ -492,24 +496,50 @@ class TripViewModel(
 
     fun saveTrip(trip: Trip, onComplete: (Long) -> Unit = {}) {
         viewModelScope.launch {
-            val id = if (trip.id == 0L) {
-                repository.insertTrip(trip)
+            if (trip.id == 0L) {
+                val id = repository.insertTrip(trip)
+                if (trip.truckPlate.isNotBlank() && trip.effectiveFuelLiters > 0.0) {
+                    fleetRepository?.adjustVehicleFuel(trip.truckPlate, -trip.effectiveFuelLiters)
+                }
+                onComplete(id)
             } else {
+                val oldTrip = allTrips.value.find { it.id == trip.id }
+                if (oldTrip != null && fleetRepository != null) {
+                    if (oldTrip.truckPlate.equals(trip.truckPlate, ignoreCase = true)) {
+                        val deltaFuel = trip.effectiveFuelLiters - oldTrip.effectiveFuelLiters
+                        if (deltaFuel != 0.0 && trip.truckPlate.isNotBlank()) {
+                            fleetRepository.adjustVehicleFuel(trip.truckPlate, -deltaFuel)
+                        }
+                    } else {
+                        if (oldTrip.truckPlate.isNotBlank() && oldTrip.effectiveFuelLiters > 0.0) {
+                            fleetRepository.adjustVehicleFuel(oldTrip.truckPlate, oldTrip.effectiveFuelLiters)
+                        }
+                        if (trip.truckPlate.isNotBlank() && trip.effectiveFuelLiters > 0.0) {
+                            fleetRepository.adjustVehicleFuel(trip.truckPlate, -trip.effectiveFuelLiters)
+                        }
+                    }
+                }
                 repository.updateTrip(trip)
-                trip.id
+                onComplete(trip.id)
             }
-            onComplete(id)
         }
     }
 
     fun deleteTrip(trip: Trip) {
         viewModelScope.launch {
+            if (trip.truckPlate.isNotBlank() && trip.effectiveFuelLiters > 0.0) {
+                fleetRepository?.adjustVehicleFuel(trip.truckPlate, trip.effectiveFuelLiters)
+            }
             repository.deleteTrip(trip)
         }
     }
 
     fun deleteTripById(id: Long) {
         viewModelScope.launch {
+            val trip = allTrips.value.find { it.id == id }
+            if (trip != null && trip.truckPlate.isNotBlank() && trip.effectiveFuelLiters > 0.0) {
+                fleetRepository?.adjustVehicleFuel(trip.truckPlate, trip.effectiveFuelLiters)
+            }
             repository.deleteTripById(id)
         }
     }
@@ -656,7 +686,12 @@ class TripViewModel(
         viewModelScope.launch {
             val allTrips = repository.getAllTripsList()
             val toDelete = allTrips.filter { it.id in tripIds }
-            toDelete.forEach { repository.deleteTrip(it) }
+            toDelete.forEach { t ->
+                if (t.truckPlate.isNotBlank() && t.effectiveFuelLiters > 0.0) {
+                    fleetRepository?.adjustVehicleFuel(t.truckPlate, t.effectiveFuelLiters)
+                }
+                repository.deleteTrip(t)
+            }
         }
     }
 }

@@ -143,7 +143,8 @@ enum class DocumentType(val label: String) {
     DIAGNOSTIC_CARD("Техосмотр (ДК)"),
     TACHOGRAPH_CALIBRATION("Поверка тахографа"),
     PASS("Пропуск (СК/МКАД/Порт)"),
-    MEDICAL("Медсправка водителя")
+    MEDICAL("Медсправка водителя"),
+    PLATON("Платон")
 }
 
 @Entity(tableName = "fleet_documents")

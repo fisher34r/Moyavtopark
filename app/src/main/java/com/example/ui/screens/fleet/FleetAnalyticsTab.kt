@@ -31,6 +31,9 @@ import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,7 +84,11 @@ fun FleetAnalyticsTab(
     var vehicleDropdownExpanded by remember { mutableStateOf(false) }
     var driverDropdownExpanded by remember { mutableStateOf(false) }
     var dateDropdownExpanded by remember { mutableStateOf(false) }
-    val dateOptions = listOf("За все время", "Этот месяц", "Прошлый месяц")
+    val context = LocalContext.current
+    val now = remember { System.currentTimeMillis() }
+    var customStartDate by remember { mutableStateOf(now - 30L * 24 * 60 * 60 * 1000) }
+    var customEndDate by remember { mutableStateOf(now) }
+    val dateOptions = listOf("За все время", "Этот месяц", "Прошлый месяц", "Произвольный период")
     var selectedDateText by remember { mutableStateOf(dateOptions[0]) }
 
     Column(
@@ -138,6 +145,10 @@ fun FleetAnalyticsTab(
                                         cal.add(java.util.Calendar.MONTH, 1)
                                         viewModel.analyticsDateEnd.value = cal.timeInMillis - 1
                                     }
+                                    "Произвольный период" -> {
+                                        viewModel.analyticsDateStart.value = customStartDate
+                                        viewModel.analyticsDateEnd.value = customEndDate
+                                    }
                                     else -> {
                                         viewModel.analyticsDateStart.value = null
                                         viewModel.analyticsDateEnd.value = null
@@ -146,6 +157,71 @@ fun FleetAnalyticsTab(
                             }
                         )
                     }
+                }
+            }
+        }
+        if (selectedDateText == "Произвольный период") {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = customStartDate }
+                        android.app.DatePickerDialog(
+                            context,
+                            { _, y, m, d ->
+                                val newCal = java.util.Calendar.getInstance().apply {
+                                    set(java.util.Calendar.YEAR, y)
+                                    set(java.util.Calendar.MONTH, m)
+                                    set(java.util.Calendar.DAY_OF_MONTH, d)
+                                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                    set(java.util.Calendar.MINUTE, 0)
+                                    set(java.util.Calendar.SECOND, 0)
+                                    set(java.util.Calendar.MILLISECOND, 0)
+                                }
+                                customStartDate = newCal.timeInMillis
+                                viewModel.analyticsDateStart.value = customStartDate
+                            },
+                            cal.get(java.util.Calendar.YEAR),
+                            cal.get(java.util.Calendar.MONTH),
+                            cal.get(java.util.Calendar.DAY_OF_MONTH)
+                        ).show()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("С: ${Formatters.formatDate(customStartDate)}", fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = customEndDate }
+                        android.app.DatePickerDialog(
+                            context,
+                            { _, y, m, d ->
+                                val newCal = java.util.Calendar.getInstance().apply {
+                                    set(java.util.Calendar.YEAR, y)
+                                    set(java.util.Calendar.MONTH, m)
+                                    set(java.util.Calendar.DAY_OF_MONTH, d)
+                                    set(java.util.Calendar.HOUR_OF_DAY, 23)
+                                    set(java.util.Calendar.MINUTE, 59)
+                                    set(java.util.Calendar.SECOND, 59)
+                                    set(java.util.Calendar.MILLISECOND, 999)
+                                }
+                                customEndDate = newCal.timeInMillis
+                                viewModel.analyticsDateEnd.value = customEndDate
+                            },
+                            cal.get(java.util.Calendar.YEAR),
+                            cal.get(java.util.Calendar.MONTH),
+                            cal.get(java.util.Calendar.DAY_OF_MONTH)
+                        ).show()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("По: ${Formatters.formatDate(customEndDate)}", fontSize = 12.sp)
                 }
             }
         }

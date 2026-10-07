@@ -137,6 +137,7 @@ fun TripReportsScreen(
 
     var selectedDriver by remember { mutableStateOf<String?>(null) }
     var selectedTruck by remember { mutableStateOf<String?>(null) }
+    var selectedCustomer by remember { mutableStateOf<String?>(null) }
 
     val availableDrivers = remember(allTrips, registeredDriversList) {
         val fromTrips = allTrips.map { it.driverName.trim() }.filter { it.isNotBlank() }
@@ -148,6 +149,10 @@ fun TripReportsScreen(
         val fromTrips = allTrips.map { it.truckPlate.trim() }.filter { it.isNotBlank() }
         val fromReg = registeredVehiclesList.map { it.plateNumber.trim() }.filter { it.isNotBlank() }
         (fromTrips + fromReg).distinct().sorted()
+    }
+
+    val availableCustomers = remember(allTrips) {
+        allTrips.map { it.customerName.trim() }.filter { it.isNotBlank() }.distinct().sorted()
     }
 
     val now = remember { System.currentTimeMillis() }
@@ -214,12 +219,13 @@ fun TripReportsScreen(
         }
     }
 
-    // Filter trips by Vehicle (ТС) and Driver (водитель)
-    val filteredTrips = remember(periodTrips, selectedDriver, selectedTruck) {
+    // Filter trips by Vehicle (ТС), Driver (водитель) and Customer (заказчик)
+    val filteredTrips = remember(periodTrips, selectedDriver, selectedTruck, selectedCustomer) {
         periodTrips.filter { trip ->
             val matchDriver = selectedDriver == null || trip.driverName.equals(selectedDriver, ignoreCase = true)
             val matchTruck = selectedTruck == null || trip.truckPlate.equals(selectedTruck, ignoreCase = true)
-            matchDriver && matchTruck
+            val matchCustomer = selectedCustomer == null || trip.customerName.equals(selectedCustomer, ignoreCase = true)
+            matchDriver && matchTruck && matchCustomer
         }
     }
 
@@ -311,7 +317,7 @@ fun TripReportsScreen(
         }
     }
 
-    val currentPeriodTitle = remember(selectedPeriod, customStartDate, customEndDate, selectedDriver, selectedTruck) {
+    val currentPeriodTitle = remember(selectedPeriod, customStartDate, customEndDate, selectedDriver, selectedTruck, selectedCustomer) {
         val basePeriod = when (selectedPeriod) {
             ReportPeriod.ALL_TIME -> "За все время"
             ReportPeriod.TODAY -> "Сегодня (${Formatters.formatDate(now)})"
@@ -325,11 +331,12 @@ fun TripReportsScreen(
             append(basePeriod)
             if (selectedDriver != null) append(" | Водитель: $selectedDriver")
             if (selectedTruck != null) append(" | ТС: $selectedTruck")
+            if (selectedCustomer != null) append(" | Заказчик: $selectedCustomer")
         }
     }
 
     // Formatted report string for export/sharing based on selected report type
-    val reportText = remember(filteredTrips, selectedPeriod, selectedReportType, currentPeriodTitle, selectedDriver, selectedTruck) {
+    val reportText = remember(filteredTrips, selectedPeriod, selectedReportType, currentPeriodTitle, selectedDriver, selectedTruck, selectedCustomer) {
         val periodName = currentPeriodTitle
 
         buildString {
@@ -338,6 +345,7 @@ fun TripReportsScreen(
             appendLine("   Период: $periodName")
             if (selectedDriver != null) appendLine("   Водитель: $selectedDriver")
             if (selectedTruck != null) appendLine("   Транспортное средство (ТС): $selectedTruck")
+            if (selectedCustomer != null) appendLine("   Заказчик: $selectedCustomer")
             appendLine("   Дата формирования: ${Formatters.formatDateTime(now)}")
             appendLine("═════════════════════════════════════")
             appendLine()
@@ -736,7 +744,8 @@ fun TripReportsScreen(
                                     )
                                     val activeFiltersCount = (if (selectedPeriod != ReportPeriod.ALL_TIME) 1 else 0) +
                                             (if (selectedDriver != null) 1 else 0) +
-                                            (if (selectedTruck != null) 1 else 0)
+                                            (if (selectedTruck != null) 1 else 0) +
+                                            (if (selectedCustomer != null) 1 else 0)
                                     if (activeFiltersCount > 0) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Box(
@@ -761,6 +770,7 @@ fun TripReportsScreen(
                                         append(selectedPeriod.title)
                                         selectedDriver?.let { append(" • $it") }
                                         selectedTruck?.let { append(" • $it") }
+                                        selectedCustomer?.let { append(" • $it") }
                                     },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -770,12 +780,13 @@ fun TripReportsScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (selectedPeriod != ReportPeriod.ALL_TIME || selectedDriver != null || selectedTruck != null) {
+                            if (selectedPeriod != ReportPeriod.ALL_TIME || selectedDriver != null || selectedTruck != null || selectedCustomer != null) {
                                 TextButton(
                                     onClick = {
                                         selectedPeriod = ReportPeriod.ALL_TIME
                                         selectedDriver = null
                                         selectedTruck = null
+                                        selectedCustomer = null
                                     },
                                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
@@ -969,10 +980,48 @@ fun TripReportsScreen(
                                 }
                             }
 
-                            // 5. Отображение на экране
+                            // 5. Заказчик
                             Column {
                                 Text(
-                                    text = "5. Режим отображения на экране:",
+                                    text = "5. Заказчик:",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = selectedCustomer == null,
+                                        onClick = { selectedCustomer = null },
+                                        label = { Text("Все заказчики (${periodTrips.size})", fontSize = 12.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    )
+                                    availableCustomers.forEach { customer ->
+                                        val customerCount = periodTrips.count { it.customerName.equals(customer, ignoreCase = true) }
+                                        FilterChip(
+                                            selected = selectedCustomer == customer,
+                                            onClick = { selectedCustomer = if (selectedCustomer == customer) null else customer },
+                                            label = { Text("$customer ($customerCount)", fontSize = 12.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 6. Отображение на экране
+                            Column {
+                                Text(
+                                    text = "6. Режим отображения на экране:",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.primary
                                 )

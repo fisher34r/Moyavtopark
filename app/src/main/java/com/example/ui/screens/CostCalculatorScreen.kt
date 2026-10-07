@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -122,6 +123,10 @@ fun CostCalculatorScreen(
     var depreciationRateText by remember { mutableStateOf(settings.calcDepreciationRatePerKm.let { if (it > 0) it.toString() else "5.0" }) }
 
     var marginPercentText by remember { mutableStateOf(settings.calcDesiredMarginPercent.let { if (it > 0) it.toString() else "20.0" }) }
+
+    // Client rate offer state
+    var clientRateMode by remember { mutableStateOf("PER_TON") } // "PER_TON", "PER_KM", "FIXED"
+    var clientRateValueText by remember { mutableStateOf("") }
 
     // Parsed numerical values
     val loadedDist = loadedDistText.toDoubleOrNull() ?: 0.0
@@ -248,6 +253,27 @@ fun CostCalculatorScreen(
             }
             appendLine("Ставка за км: ${String.format(Locale.US, "%.2f", freightPerKm)} ₽/км")
             appendLine("Планируемая прибыль: ${String.format(Locale.US, "%.2f", netProfit)} ₽")
+            val cVal = clientRateValueText.toDoubleOrNull() ?: 0.0
+            if (cVal > 0) {
+                val cRev = when (clientRateMode) {
+                    "PER_TON" -> cVal * (if (weightTons > 0) weightTons else 1.0)
+                    "PER_KM" -> cVal * (if (totalDist > 0) totalDist else 1.0)
+                    else -> cVal
+                }
+                val cCost = if (driverPayMode == "PERCENT") {
+                    val dPct = cRev * (driverSalaryPercent / 100.0)
+                    directFixedCosts - totalPerDiem + (dPct + totalPerDiem)
+                } else totalTripCost
+                val cProf = cRev - cCost
+                val cMarg = if (cRev > 0) (cProf / cRev) * 100.0 else 0.0
+                appendLine()
+                appendLine("РАСЧЁТ ПО ПРЕДЛОЖЕННОЙ СТАВКЕ:")
+                appendLine("Ставка: ${String.format(Locale.US, "%.2f", cVal)} ₽ (${if (clientRateMode == "PER_TON") "за тонну" else if (clientRateMode == "PER_KM") "за км" else "фикс за рейс"})")
+                appendLine("Выручка: ${String.format(Locale.US, "%.2f", cRev)} ₽")
+                appendLine("Себестоимость: ${String.format(Locale.US, "%.2f", cCost)} ₽")
+                appendLine("Чистая прибыль: ${String.format(Locale.US, "%.2f", cProf)} ₽")
+                appendLine("Рентабельность: ${String.format(Locale.US, "%.1f", cMarg)}%")
+            }
         }
     }
 
@@ -475,6 +501,194 @@ fun CostCalculatorScreen(
                             amount = depreciationCost,
                             total = totalTripCost
                         )
+                    }
+                }
+            }
+
+            // --- CUSTOMER OFFERED RATE CARD ---
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("calc_customer_rate_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Оценка расценки / ставки заказчика",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Расчёт чистой прибыли по предложению клиента",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Mode chips: ₽/т, ₽/км, Фикс ₽
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = clientRateMode == "PER_TON",
+                            onClick = { clientRateMode = "PER_TON" },
+                            label = { Text("₽ / т (тонна)") }
+                        )
+                        FilterChip(
+                            selected = clientRateMode == "PER_KM",
+                            onClick = { clientRateMode = "PER_KM" },
+                            label = { Text("₽ / км (пробег)") }
+                        )
+                        FilterChip(
+                            selected = clientRateMode == "FIXED",
+                            onClick = { clientRateMode = "FIXED" },
+                            label = { Text("Фикс ₽ за рейс") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val rateLabel = when (clientRateMode) {
+                        "PER_TON" -> "Ставка заказчика (₽ за тонну)"
+                        "PER_KM" -> "Ставка заказчика (₽ за 1 км пути)"
+                        else -> "Фиксированная сумма фрахта (₽ за рейс)"
+                    }
+
+                    SelectOnFocusTextField(
+                        value = clientRateValueText,
+                        onValueChange = { clientRateValueText = it },
+                        label = { Text(rateLabel) },
+                        placeholder = { Text("Например: ${if (clientRateMode == "PER_TON") "2500" else if (clientRateMode == "PER_KM") "85" else "75000"}") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    val clientRateVal = clientRateValueText.toDoubleOrNull() ?: 0.0
+                    if (clientRateVal > 0) {
+                        val clientGrossRevenue = when (clientRateMode) {
+                            "PER_TON" -> clientRateVal * (if (weightTons > 0) weightTons else 1.0)
+                            "PER_KM" -> clientRateVal * (if (totalDist > 0) totalDist else 1.0)
+                            else -> clientRateVal
+                        }
+
+                        val clientTotalCost = if (driverPayMode == "PERCENT") {
+                            val clientDriverPctPay = clientGrossRevenue * (driverSalaryPercent / 100.0)
+                            directFixedCosts - totalPerDiem + (clientDriverPctPay + totalPerDiem)
+                        } else {
+                            totalTripCost
+                        }
+
+                        val clientProfit = clientGrossRevenue - clientTotalCost
+                        val clientMargin = if (clientGrossRevenue > 0) (clientProfit / clientGrossRevenue) * 100.0 else 0.0
+                        val isProfitable = clientProfit >= 0
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Выручка (фрахт):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${String.format(Locale.US, "%,.0f", clientGrossRevenue).replace(',', ' ')} ₽",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "Себестоимость рейса:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${String.format(Locale.US, "%,.0f", clientTotalCost).replace(',', ' ')} ₽",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isProfitable) Color(0xFF1B5E20).copy(alpha = 0.12f) else Color(0xFFB71C1C).copy(alpha = 0.12f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = if (isProfitable) "Чистая прибыль:" else "Убыток от рейса:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (isProfitable) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${if (clientProfit > 0) "+" else ""}${String.format(Locale.US, "%,.0f", clientProfit).replace(',', ' ')} ₽",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isProfitable) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Рентабельность:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", clientMargin)}%",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isProfitable) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

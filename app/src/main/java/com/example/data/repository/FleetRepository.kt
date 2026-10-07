@@ -27,7 +27,9 @@ class FleetRepository(
     suspend fun insertFuelRecord(record: FuelRecord) = fuelDao.insertFuelRecord(record)
     suspend fun insertFuelRecords(records: List<FuelRecord>) = fuelDao.insertFuelRecords(records)
     suspend fun updateFuelRecord(record: FuelRecord) = fuelDao.updateFuelRecord(record)
+    suspend fun updateFuelRecords(records: List<FuelRecord>) = fuelDao.updateFuelRecords(records)
     suspend fun deleteFuelRecord(record: FuelRecord) = fuelDao.deleteFuelRecord(record)
+    suspend fun deleteFuelRecordsByIds(ids: List<Long>) = fuelDao.deleteFuelRecordsByIds(ids)
     suspend fun deleteAllFuelRecords() = fuelDao.deleteAllFuelRecords()
 
 
@@ -72,6 +74,17 @@ class FleetRepository(
     suspend fun insertDocument(doc: FleetDocument) = docDao.insertDocument(doc)
     suspend fun insertDocuments(docs: List<FleetDocument>) = docDao.insertDocuments(docs)
     suspend fun updateDocument(doc: FleetDocument) = docDao.updateDocument(doc)
+    suspend fun updateDocuments(docs: List<FleetDocument>) = docDao.updateDocuments(docs)
     suspend fun deleteDocument(doc: FleetDocument) = docDao.deleteDocument(doc)
+    suspend fun deleteDocumentsByIds(ids: List<Long>) = docDao.deleteDocumentsByIds(ids)
     suspend fun deleteAllDocuments() = docDao.deleteAllDocuments()
+
+    // 7. Корректировка топлива в баке ТС
+    suspend fun adjustVehicleFuel(plateNumber: String, deltaLiters: Double) {
+        if (plateNumber.isBlank() || deltaLiters == 0.0) return
+        val vehicle = vehicleDao.getVehicleByPlate(plateNumber) ?: return
+        val maxCap = if (vehicle.fuelTankCapacityLiters > 0) vehicle.fuelTankCapacityLiters else 600.0
+        val newFuel = (vehicle.currentFuelLiters + deltaLiters).coerceIn(0.0, maxCap)
+        vehicleDao.updateVehicle(vehicle.copy(currentFuelLiters = newFuel))
+    }
 }

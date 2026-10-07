@@ -414,12 +414,46 @@ class FleetViewModel(
         }
     }
 
+    fun batchDeleteDocuments(ids: Set<Long>) {
+        viewModelScope.launch {
+            fleetRepository.deleteDocumentsByIds(ids.toList())
+        }
+    }
+
+    fun batchUpdateDocuments(
+        ids: Set<Long>,
+        newVehiclePlateOrDriver: String? = null,
+        newIssuingAuthority: String? = null
+    ) {
+        viewModelScope.launch {
+            val allD = documents.value
+            val toUpdate = allD.filter { it.id in ids }.map { doc ->
+                doc.copy(
+                    vehiclePlateOrDriver = newVehiclePlateOrDriver ?: doc.vehiclePlateOrDriver,
+                    issuingAuthority = newIssuingAuthority ?: doc.issuingAuthority
+                )
+            }
+            fleetRepository.updateDocuments(toUpdate)
+        }
+    }
+
     // Actions for FuelRecord
     fun saveFuelRecord(record: com.example.data.fleet.FuelRecord) {
         viewModelScope.launch {
             if (record.id == 0L) {
                 fleetRepository.insertFuelRecord(record)
+                fleetRepository.adjustVehicleFuel(record.vehiclePlate, record.liters)
             } else {
+                val oldRecord = fuelRecords.value.find { it.id == record.id }
+                if (oldRecord != null) {
+                    if (oldRecord.vehiclePlate == record.vehiclePlate) {
+                        val delta = record.liters - oldRecord.liters
+                        fleetRepository.adjustVehicleFuel(record.vehiclePlate, delta)
+                    } else {
+                        fleetRepository.adjustVehicleFuel(oldRecord.vehiclePlate, -oldRecord.liters)
+                        fleetRepository.adjustVehicleFuel(record.vehiclePlate, record.liters)
+                    }
+                }
                 fleetRepository.updateFuelRecord(record)
             }
         }
@@ -427,7 +461,35 @@ class FleetViewModel(
 
     fun deleteFuelRecord(record: com.example.data.fleet.FuelRecord) {
         viewModelScope.launch {
+            fleetRepository.adjustVehicleFuel(record.vehiclePlate, -record.liters)
             fleetRepository.deleteFuelRecord(record)
+        }
+    }
+
+    fun batchDeleteFuelRecords(ids: Set<Long>) {
+        viewModelScope.launch {
+            val recordsToDelete = fuelRecords.value.filter { it.id in ids }
+            recordsToDelete.forEach { r ->
+                fleetRepository.adjustVehicleFuel(r.vehiclePlate, -r.liters)
+            }
+            fleetRepository.deleteFuelRecordsByIds(ids.toList())
+        }
+    }
+
+    fun batchUpdateFuelRecords(
+        ids: Set<Long>,
+        newVehiclePlate: String? = null,
+        newStationName: String? = null
+    ) {
+        viewModelScope.launch {
+            val allF = fuelRecords.value
+            val toUpdate = allF.filter { it.id in ids }.map { r ->
+                r.copy(
+                    vehiclePlate = newVehiclePlate ?: r.vehiclePlate,
+                    stationName = newStationName ?: r.stationName
+                )
+            }
+            fleetRepository.updateFuelRecords(toUpdate)
         }
     }
 }

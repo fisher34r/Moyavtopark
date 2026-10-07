@@ -22,6 +22,9 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles WHERE id = :id")
     fun getVehicleById(id: Long): Flow<Vehicle?>
 
+    @Query("SELECT * FROM vehicles WHERE plateNumber = :plate LIMIT 1")
+    suspend fun getVehicleByPlate(plate: String): Vehicle?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: Vehicle): Long
 
@@ -136,8 +139,14 @@ interface FleetDocumentDao {
     @Update
     suspend fun updateDocument(document: FleetDocument)
 
+    @Update
+    suspend fun updateDocuments(documents: List<FleetDocument>)
+
     @Delete
     suspend fun deleteDocument(document: FleetDocument)
+
+    @Query("DELETE FROM fleet_documents WHERE id IN (:ids)")
+    suspend fun deleteDocumentsByIds(ids: List<Long>)
 
     @Query("DELETE FROM fleet_documents")
     suspend fun deleteAllDocuments()
@@ -157,8 +166,14 @@ interface FuelDao {
     @Update
     suspend fun updateFuelRecord(record: FuelRecord)
 
+    @Update
+    suspend fun updateFuelRecords(records: List<FuelRecord>)
+
     @Delete
     suspend fun deleteFuelRecord(record: FuelRecord)
+
+    @Query("DELETE FROM fuel_records WHERE id IN (:ids)")
+    suspend fun deleteFuelRecordsByIds(ids: List<Long>)
 
     @Query("DELETE FROM fuel_records")
     suspend fun deleteAllFuelRecords()

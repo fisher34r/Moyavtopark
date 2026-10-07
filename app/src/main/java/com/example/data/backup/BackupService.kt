@@ -9,6 +9,7 @@ import com.example.data.fleet.DocumentType
 import com.example.data.fleet.Driver
 import com.example.data.fleet.DriverStatus
 import com.example.data.fleet.FleetDocument
+import com.example.data.fleet.FuelRecord
 import com.example.data.fleet.ServiceRecord
 import com.example.data.fleet.ServiceType
 import com.example.data.fleet.Vehicle
@@ -53,7 +54,8 @@ object BackupService {
         drivers: List<Driver> = emptyList(),
         serviceRecords: List<ServiceRecord> = emptyList(),
         waybills: List<Waybill> = emptyList(),
-        documents: List<FleetDocument> = emptyList()
+        documents: List<FleetDocument> = emptyList(),
+        fuelRecords: List<FuelRecord> = emptyList()
     ): String {
         val root = JSONObject()
         root.put("app", "Зерновоз")
@@ -226,6 +228,25 @@ object BackupService {
             docsArray.put(docObj)
         }
         root.put("fleetDocuments", docsArray)
+
+        // Сериализация Заправок автопарка
+        val fuelArray = JSONArray()
+        fuelRecords.forEach { f ->
+            val fObj = JSONObject().apply {
+                put("id", f.id)
+                put("vehiclePlate", f.vehiclePlate)
+                put("date", f.date)
+                put("liters", f.liters)
+                put("pricePerLiter", f.pricePerLiter)
+                put("totalCost", f.totalCost)
+                put("stationName", f.stationName)
+                if (f.odometerKm != null) put("odometerKm", f.odometerKm)
+                put("notes", f.notes)
+                put("createdAt", f.createdAt)
+            }
+            fuelArray.put(fObj)
+        }
+        root.put("fuelRecords", fuelArray)
 
         return root.toString(2)
     }
@@ -483,6 +504,32 @@ object BackupService {
                     }
                     fleetRepository.insertDocuments(restoredDocs)
                 }
+
+                // Заправки
+                if (root.has("fuelRecords")) {
+                    val fArray = root.getJSONArray("fuelRecords")
+                    val restoredFuel = mutableListOf<FuelRecord>()
+                    for (i in 0 until fArray.length()) {
+                        val obj = fArray.getJSONObject(i)
+                        val fuel = FuelRecord(
+                            id = if (replaceExisting) obj.optLong("id", 0L) else 0L,
+                            vehiclePlate = obj.getString("vehiclePlate"),
+                            date = obj.optLong("date", System.currentTimeMillis()),
+                            liters = obj.optDouble("liters", 0.0),
+                            pricePerLiter = obj.optDouble("pricePerLiter", 0.0),
+                            totalCost = obj.optDouble("totalCost", 0.0),
+                            stationName = obj.optString("stationName", ""),
+                            odometerKm = if (obj.has("odometerKm")) obj.getDouble("odometerKm") else null,
+                            notes = obj.optString("notes", ""),
+                            createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+                        )
+                        restoredFuel.add(fuel)
+                    }
+                    if (replaceExisting) {
+                        fleetRepository.deleteAllFuelRecords()
+                    }
+                    fleetRepository.insertFuelRecords(restoredFuel)
+                }
             }
 
             val fleetMsg = if (restoredVehiclesCount > 0 || restoredDriversCount > 0) {
@@ -532,7 +579,8 @@ object BackupService {
         drivers: List<Driver> = emptyList(),
         serviceRecords: List<ServiceRecord> = emptyList(),
         waybills: List<Waybill> = emptyList(),
-        documents: List<FleetDocument> = emptyList()
+        documents: List<FleetDocument> = emptyList(),
+        fuelRecords: List<FuelRecord> = emptyList()
     ): Uri {
         val json = createBackupJson(
             trips = trips,
@@ -541,7 +589,8 @@ object BackupService {
             drivers = drivers,
             serviceRecords = serviceRecords,
             waybills = waybills,
-            documents = documents
+            documents = documents,
+            fuelRecords = fuelRecords
         )
         val dateStr = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
         val fileName = "zernovoz_backup_$dateStr.json"
