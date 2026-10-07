@@ -5,11 +5,13 @@ import com.example.data.fleet.FleetDocument
 import com.example.data.fleet.ServiceRecord
 import com.example.data.fleet.Vehicle
 import com.example.data.fleet.Waybill
+import com.example.data.fleet.FuelRecord
 import com.example.data.local.fleet.DriverDao
 import com.example.data.local.fleet.FleetDocumentDao
 import com.example.data.local.fleet.ServiceRecordDao
 import com.example.data.local.fleet.VehicleDao
 import com.example.data.local.fleet.WaybillDao
+import com.example.data.local.fleet.FuelDao
 import kotlinx.coroutines.flow.Flow
 
 class FleetRepository(
@@ -17,8 +19,18 @@ class FleetRepository(
     private val driverDao: DriverDao,
     private val serviceDao: ServiceRecordDao,
     private val waybillDao: WaybillDao,
-    private val docDao: FleetDocumentDao
+    private val docDao: FleetDocumentDao,
+    private val fuelDao: FuelDao
 ) {
+    // 6. Fuel Records
+    val allFuelRecords: Flow<List<FuelRecord>> = fuelDao.getAllFuelRecords()
+    suspend fun insertFuelRecord(record: FuelRecord) = fuelDao.insertFuelRecord(record)
+    suspend fun insertFuelRecords(records: List<FuelRecord>) = fuelDao.insertFuelRecords(records)
+    suspend fun updateFuelRecord(record: FuelRecord) = fuelDao.updateFuelRecord(record)
+    suspend fun deleteFuelRecord(record: FuelRecord) = fuelDao.deleteFuelRecord(record)
+    suspend fun deleteAllFuelRecords() = fuelDao.deleteAllFuelRecords()
+
+
     // 1. Автопарк (ТС)
     val allVehicles: Flow<List<Vehicle>> = vehicleDao.getAllVehicles()
     suspend fun insertVehicle(vehicle: Vehicle) = vehicleDao.insertVehicle(vehicle)

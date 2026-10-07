@@ -1,4 +1,4 @@
-package com.example
+﻿package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -79,7 +79,8 @@ class MainActivity : ComponentActivity() {
                     driverDao = database.driverDao(),
                     serviceDao = database.serviceRecordDao(),
                     waybillDao = database.waybillDao(),
-                    docDao = database.fleetDocumentDao()
+                    docDao = database.fleetDocumentDao(),
+                    fuelDao = database.fuelDao()
                 )
             }
 
@@ -128,10 +129,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripList)
                                                 Icons.Filled.LocalShipping else Icons.Outlined.LocalShipping,
-                                            contentDescription = "Рейсы"
+                                            contentDescription = "Р РµР№СЃС‹"
                                         )
                                     },
-                                    label = { Text("Рейсы") },
+                                    label = { Text("Р РµР№СЃС‹") },
                                     modifier = Modifier.testTag("nav_tab_trips")
                                 )
 
@@ -142,10 +143,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.Fleet)
                                                 Icons.Filled.DirectionsCar else Icons.Outlined.DirectionsCar,
-                                            contentDescription = "Автопарк"
+                                            contentDescription = "РђРІС‚РѕРїР°СЂРє"
                                         )
                                     },
-                                    label = { Text("Автопарк") },
+                                    label = { Text("РђРІС‚РѕРїР°СЂРє") },
                                     modifier = Modifier.testTag("nav_tab_fleet")
                                 )
 
@@ -156,10 +157,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.CostCalculator)
                                                 Icons.Filled.Calculate else Icons.Outlined.Calculate,
-                                            contentDescription = "Расчёт"
+                                            contentDescription = "Р Р°СЃС‡С‘С‚"
                                         )
                                     },
-                                    label = { Text("Расчёт") },
+                                    label = { Text("Р Р°СЃС‡С‘С‚") },
                                     modifier = Modifier.testTag("nav_tab_calculator")
                                 )
 
@@ -170,10 +171,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripReports)
                                                 Icons.Filled.Assessment else Icons.Outlined.Assessment,
-                                            contentDescription = "Отчеты"
+                                            contentDescription = "РћС‚С‡РµС‚С‹"
                                         )
                                     },
-                                    label = { Text("Отчеты") },
+                                    label = { Text("РћС‚С‡РµС‚С‹") },
                                     modifier = Modifier.testTag("nav_tab_reports")
                                 )
 
@@ -184,10 +185,10 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = if (currentDestination is NavigationDestination.TripSettings)
                                                 Icons.Filled.Settings else Icons.Outlined.Settings,
-                                            contentDescription = "Настройки"
+                                            contentDescription = "РќР°СЃС‚СЂРѕР№РєРё"
                                         )
                                     },
-                                    label = { Text("Настройки") },
+                                    label = { Text("РќР°СЃС‚СЂРѕР№РєРё") },
                                     modifier = Modifier.testTag("nav_tab_settings")
                                 )
                             }
@@ -318,3 +319,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

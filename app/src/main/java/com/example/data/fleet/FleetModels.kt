@@ -179,3 +179,20 @@ data class FleetDocument(
     val isExpiringSoon: Boolean
         get() = daysRemaining in 0..30
 }
+
+/**
+ * 6. Fuel Record: Tracking gas station receipts
+ */
+@Entity(tableName = "fuel_records")
+data class FuelRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val vehiclePlate: String,
+    val date: Long = System.currentTimeMillis(),
+    val liters: Double,
+    val pricePerLiter: Double,
+    val totalCost: Double,
+    val stationName: String = "",
+    val odometerKm: Double? = null,
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)

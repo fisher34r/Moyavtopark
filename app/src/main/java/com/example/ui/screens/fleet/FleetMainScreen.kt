@@ -1,4 +1,4 @@
-package com.example.ui.screens.fleet
+﻿package com.example.ui.screens.fleet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,10 +60,12 @@ fun FleetMainScreen(
     val summary by viewModel.analyticsSummary.collectAsStateWithLifecycle()
 
     val tabs = listOf(
-        FleetTabItem("Автопарк (ТС)", Icons.Default.LocalShipping, summary.totalVehicles),
+        FleetTabItem("Транспорт", Icons.Default.LocalShipping, summary.totalVehicles),
         FleetTabItem("Водители", Icons.Default.Group, summary.totalDrivers),
-        FleetTabItem("Сервис и ТО", Icons.Default.Build, summary.vehiclesInService),
-        FleetTabItem("Аналитика и затраты", Icons.Default.Analytics)
+        FleetTabItem("ТО и Ремонт", Icons.Default.Build, summary.vehiclesInService),
+        FleetTabItem("Заправки", Icons.Default.LocalGasStation),
+        FleetTabItem("Документы", Icons.Default.Policy),
+        FleetTabItem("Аналитика", Icons.Default.Analytics)
     )
 
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -85,11 +89,11 @@ fun FleetMainScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Управление автопарком",
+                            text = "РЈРїСЂР°РІР»РµРЅРёРµ Р°РІС‚РѕРїР°СЂРєРѕРј",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "Тягачи • Прицепы • Водители • Сервис • Аналитика",
+                            text = "РўСЏРіР°С‡Рё вЂў РџСЂРёС†РµРїС‹ вЂў Р’РѕРґРёС‚РµР»Рё вЂў РЎРµСЂРІРёСЃ вЂў РђРЅР°Р»РёС‚РёРєР°",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -162,7 +166,9 @@ fun FleetMainScreen(
                     onNavigateToReports = onNavigateToReportsForDriver
                 )
                 2 -> FleetServiceTab(viewModel = viewModel)
-                3 -> FleetAnalyticsTab(
+                3 -> FleetFuelTab(viewModel = viewModel)
+                4 -> FleetDocumentsTab(viewModel = viewModel)
+                5 -> FleetAnalyticsTab(
                     viewModel = viewModel,
                     onNavigateToReports = onNavigateToReports
                 )
@@ -175,3 +181,9 @@ fun FleetMainScreen(
         }
     }
 }
+
+
+
+
+
+

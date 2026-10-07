@@ -69,6 +69,9 @@ class FleetViewModel(
     val documents: StateFlow<List<FleetDocument>> = fleetRepository.allDocuments
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val fuelRecords: StateFlow<List<com.example.data.fleet.FuelRecord>> = fleetRepository.allFuelRecords
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val trips: StateFlow<List<Trip>> = tripRepository.allTrips
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -140,11 +143,47 @@ class FleetViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // 5. Аналитика и затраты (TCO, удельный расход на 1 км, расход ГСМ)
+    val analyticsDateStart = MutableStateFlow<Long?>(null)
+    val analyticsDateEnd = MutableStateFlow<Long?>(null)
+    val analyticsVehiclePlate = MutableStateFlow<String?>(null)
+    val analyticsDriverName = MutableStateFlow<String?>(null)
+
     val analyticsSummary: StateFlow<FleetAnalyticsSummary> = combine(
-        combine(vehicles, drivers) { v, d -> Pair(v, d) },
-        combine(serviceRecords, documents) { s, doc -> Pair(s, doc) },
-        combine(trips, waybills) { t, w -> Pair(t, w) }
-    ) { (vList, dList), (sList, docList), (tList, wList) ->
+        combine(vehicles, drivers, analyticsVehiclePlate, analyticsDriverName) { v, d, p, dn -> 
+            val filteredV = if (p != null) v.filter { it.plateNumber == p } else v
+            val filteredD = if (dn != null) d.filter { it.fullName == dn } else d
+            Pair(filteredV, filteredD)
+        },
+        combine(serviceRecords, documents, fuelRecords) { s, doc, f -> 
+            Triple(s, doc, f)
+        },
+        combine(trips, waybills, analyticsDateStart, analyticsDateEnd) { t, w, ds, de -> 
+            val filteredT = t.filter {
+                (ds == null || it.loadingDate >= ds) && (de == null || it.loadingDate <= de)
+            }
+            val filteredW = w.filter {
+                (ds == null || it.date >= ds) && (de == null || it.date <= de)
+            }
+            Pair(filteredT, filteredW)
+        }
+    ) { (vList, dList), (sListRaw, docListRaw, fListRaw), (tList, wList) ->
+        val plateFilter = analyticsVehiclePlate.value
+        val ds = analyticsDateStart.value
+        val de = analyticsDateEnd.value
+
+        val sList = sListRaw.filter {
+            (plateFilter == null || it.vehiclePlate == plateFilter) &&
+            (ds == null || it.date >= ds) && (de == null || it.date <= de)
+        }
+        val docList = docListRaw.filter {
+            (plateFilter == null || it.vehiclePlateOrDriver == plateFilter) &&
+            (ds == null || it.issueDate >= ds) && (de == null || it.issueDate <= de)
+        }
+        val fList = fListRaw.filter {
+            (plateFilter == null || it.vehiclePlate == plateFilter) &&
+            (ds == null || it.date >= ds) && (de == null || it.date <= de)
+        }
+
         val totalVehicles = vList.size
         val onTrip = vList.count { it.status == VehicleStatus.ACTIVE }
         val available = vList.count { it.status == VehicleStatus.AVAILABLE }
@@ -152,22 +191,25 @@ class FleetViewModel(
 
         val serviceTotal = sList.sumOf { it.cost }
         val docsTotal = docList.sumOf { it.cost }
+        val fuelTotal = fList.sumOf { it.totalCost }
+        val fuelLitersTotal = fList.sumOf { it.liters }
 
-        val tripsFuelCost = tList.sumOf { it.fuelExpenses }
-        val tripsFuelLiters = tList.sumOf { it.effectiveFuelLiters }
-        val tripsDistance = tList.sumOf { it.distanceKm }
+        // Filter trips by driver if selected
+        val driverName = analyticsDriverName.value
+        val finalTList = if (driverName != null) tList.filter { it.driverName == driverName } else tList
 
+        val tripsDistance = finalTList.sumOf { it.distanceKm }
         val waybillsDistance = wList.sumOf { it.totalDistanceKm }
-        val waybillsFuelConsumed = wList.sumOf { it.totalFuelConsumedLiters }
 
         val rawDist = maxOf(tripsDistance, waybillsDistance)
         val totalDist = if (rawDist > 0.0) rawDist else 1.0
-        val totalFuelCost = if (tripsFuelCost > 0.0) tripsFuelCost else (waybillsFuelConsumed * 66.0)
-        val totalFuelLiters = if (tripsFuelLiters > 0.0) tripsFuelLiters else waybillsFuelConsumed
+        
+        val totalFuelCost = fuelTotal // Use ONLY fuel receipts as requested
+        val totalFuelLiters = fuelLitersTotal
 
-        val tripsDriverSalary = tList.sumOf { it.effectiveDriverSalary }
-        val totalRevenue = tList.sumOf { it.totalPrice }
-        val otherExpenses = tList.sumOf { it.otherExpenses }
+        val tripsDriverSalary = finalTList.sumOf { it.effectiveDriverSalary }
+        val totalRevenue = finalTList.sumOf { it.totalPrice }
+        val otherExpenses = finalTList.sumOf { it.otherExpenses }
         val totalTco = totalFuelCost + serviceTotal + docsTotal + otherExpenses + tripsDriverSalary
         val costPerKm = if (totalDist > 0.0) totalTco / totalDist else 0.0
         val netProfit = totalRevenue - totalTco
@@ -369,6 +411,23 @@ class FleetViewModel(
     fun deleteDocument(doc: FleetDocument) {
         viewModelScope.launch {
             fleetRepository.deleteDocument(doc)
+        }
+    }
+
+    // Actions for FuelRecord
+    fun saveFuelRecord(record: com.example.data.fleet.FuelRecord) {
+        viewModelScope.launch {
+            if (record.id == 0L) {
+                fleetRepository.insertFuelRecord(record)
+            } else {
+                fleetRepository.updateFuelRecord(record)
+            }
+        }
+    }
+
+    fun deleteFuelRecord(record: com.example.data.fleet.FuelRecord) {
+        viewModelScope.launch {
+            fleetRepository.deleteFuelRecord(record)
         }
     }
 }

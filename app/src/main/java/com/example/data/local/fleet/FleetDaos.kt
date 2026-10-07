@@ -11,6 +11,7 @@ import com.example.data.fleet.FleetDocument
 import com.example.data.fleet.ServiceRecord
 import com.example.data.fleet.Vehicle
 import com.example.data.fleet.Waybill
+import com.example.data.fleet.FuelRecord
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -140,4 +141,25 @@ interface FleetDocumentDao {
 
     @Query("DELETE FROM fleet_documents")
     suspend fun deleteAllDocuments()
+}
+
+@Dao
+interface FuelDao {
+    @Query("SELECT * FROM fuel_records ORDER BY date DESC")
+    fun getAllFuelRecords(): Flow<List<FuelRecord>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFuelRecord(record: FuelRecord): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFuelRecords(records: List<FuelRecord>)
+
+    @Update
+    suspend fun updateFuelRecord(record: FuelRecord)
+
+    @Delete
+    suspend fun deleteFuelRecord(record: FuelRecord)
+
+    @Query("DELETE FROM fuel_records")
+    suspend fun deleteAllFuelRecords()
 }

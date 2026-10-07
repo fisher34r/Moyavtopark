@@ -17,11 +17,13 @@ import com.example.data.fleet.VehicleStatus
 import com.example.data.fleet.VehicleType
 import com.example.data.fleet.Waybill
 import com.example.data.fleet.WaybillStatus
+import com.example.data.fleet.FuelRecord
 import com.example.data.local.fleet.DriverDao
 import com.example.data.local.fleet.FleetDocumentDao
 import com.example.data.local.fleet.ServiceRecordDao
 import com.example.data.local.fleet.VehicleDao
 import com.example.data.local.fleet.WaybillDao
+import com.example.data.local.fleet.FuelDao
 import androidx.room.migration.Migration
 import com.example.data.model.RateType
 import com.example.data.model.RouteCacheEntity
@@ -39,9 +41,10 @@ import kotlinx.coroutines.launch
         ServiceRecord::class,
         Waybill::class,
         FleetDocument::class,
-        RouteCacheEntity::class
+        RouteCacheEntity::class,
+        FuelRecord::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,6 +56,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun waybillDao(): WaybillDao
     abstract fun fleetDocumentDao(): FleetDocumentDao
     abstract fun routeCacheDao(): RouteCacheDao
+    abstract fun fuelDao(): FuelDao
 
     companion object {
         @Volatile

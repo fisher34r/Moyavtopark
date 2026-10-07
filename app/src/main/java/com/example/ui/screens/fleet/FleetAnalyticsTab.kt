@@ -1,4 +1,4 @@
-package com.example.ui.screens.fleet
+﻿package com.example.ui.screens.fleet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +42,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +63,7 @@ import com.example.ui.viewmodel.FleetViewModel
 import com.example.util.Formatters
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FleetAnalyticsTab(
     viewModel: FleetViewModel,
@@ -65,6 +73,15 @@ fun FleetAnalyticsTab(
     val summary by viewModel.analyticsSummary.collectAsStateWithLifecycle()
     val drivers by viewModel.drivers.collectAsStateWithLifecycle()
     val trips by viewModel.trips.collectAsStateWithLifecycle()
+    val vehicles by viewModel.vehicles.collectAsStateWithLifecycle()
+    val selectedPlate by viewModel.analyticsVehiclePlate.collectAsStateWithLifecycle()
+    val selectedDriver by viewModel.analyticsDriverName.collectAsStateWithLifecycle()
+    
+    var vehicleDropdownExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var driverDropdownExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var dateDropdownExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val dateOptions = listOf("За все время", "Этот месяц", "Прошлый месяц")
+    var selectedDateText by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(dateOptions[0]) }
 
     Column(
         modifier = modifier
@@ -73,7 +90,132 @@ fun FleetAnalyticsTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Hero Card: TCO (Совокупная стоимость владения)
+        // Filters
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Date Filter
+            ExposedDropdownMenuBox(
+                expanded = dateDropdownExpanded,
+                onExpandedChange = { dateDropdownExpanded = !dateDropdownExpanded },
+                modifier = Modifier.weight(1f)
+            ) {
+                OutlinedTextField(
+                    value = selectedDateText,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Период", fontSize = 10.sp) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dateDropdownExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    singleLine = true
+                )
+                ExposedDropdownMenu(
+                    expanded = dateDropdownExpanded,
+                    onDismissRequest = { dateDropdownExpanded = false }
+                ) {
+                    dateOptions.forEach { opt ->
+                        DropdownMenuItem(
+                            text = { Text(opt) },
+                            onClick = {
+                                selectedDateText = opt
+                                dateDropdownExpanded = false
+                                val cal = java.util.Calendar.getInstance()
+                                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                cal.set(java.util.Calendar.MINUTE, 0)
+                                cal.set(java.util.Calendar.SECOND, 0)
+                                cal.set(java.util.Calendar.MILLISECOND, 0)
+                                cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                                
+                                when (opt) {
+                                    "Этот месяц" -> {
+                                        viewModel.analyticsDateStart.value = cal.timeInMillis
+                                        cal.add(java.util.Calendar.MONTH, 1)
+                                        viewModel.analyticsDateEnd.value = cal.timeInMillis - 1
+                                    }
+                                    "Прошлый месяц" -> {
+                                        cal.add(java.util.Calendar.MONTH, -1)
+                                        viewModel.analyticsDateStart.value = cal.timeInMillis
+                                        cal.add(java.util.Calendar.MONTH, 1)
+                                        viewModel.analyticsDateEnd.value = cal.timeInMillis - 1
+                                    }
+                                    else -> {
+                                        viewModel.analyticsDateStart.value = null
+                                        viewModel.analyticsDateEnd.value = null
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Vehicle Filter
+            ExposedDropdownMenuBox(
+                expanded = vehicleDropdownExpanded,
+                onExpandedChange = { vehicleDropdownExpanded = !vehicleDropdownExpanded },
+                modifier = Modifier.weight(1f)
+            ) {
+                OutlinedTextField(
+                    value = selectedPlate ?: "Все ТС",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Транспорт", fontSize = 10.sp) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vehicleDropdownExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    singleLine = true
+                )
+                ExposedDropdownMenu(
+                    expanded = vehicleDropdownExpanded,
+                    onDismissRequest = { vehicleDropdownExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Все ТС", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.analyticsVehiclePlate.value = null; vehicleDropdownExpanded = false }
+                    )
+                    vehicles.forEach { v ->
+                        DropdownMenuItem(
+                            text = { Text(v.plateNumber) },
+                            onClick = { viewModel.analyticsVehiclePlate.value = v.plateNumber; vehicleDropdownExpanded = false }
+                        )
+                    }
+                }
+            }
+
+            // Driver Filter
+            ExposedDropdownMenuBox(
+                expanded = driverDropdownExpanded,
+                onExpandedChange = { driverDropdownExpanded = !driverDropdownExpanded },
+                modifier = Modifier.weight(1f)
+            ) {
+                OutlinedTextField(
+                    value = selectedDriver ?: "Все Водители",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Водитель", fontSize = 10.sp) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = driverDropdownExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    singleLine = true
+                )
+                ExposedDropdownMenu(
+                    expanded = driverDropdownExpanded,
+                    onDismissRequest = { driverDropdownExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Все Водители", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.analyticsDriverName.value = null; driverDropdownExpanded = false }
+                    )
+                    drivers.forEach { d ->
+                        DropdownMenuItem(
+                            text = { Text(d.fullName) },
+                            onClick = { viewModel.analyticsDriverName.value = d.fullName; driverDropdownExpanded = false }
+                        )
+                    }
+                }
+            }
+        }
+        // Hero Card: TCO (РЎРѕРІРѕРєСѓРїРЅР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ РІР»Р°РґРµРЅРёСЏ)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -87,12 +229,12 @@ fun FleetAnalyticsTab(
                 ) {
                     Column {
                         Text(
-                            text = "TCO (Совокупная стоимость)",
+                            text = "TCO (РЎРѕРІРѕРєСѓРїРЅР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ)",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Полные эксплуатационные затраты парка",
+                            text = "РџРѕР»РЅС‹Рµ СЌРєСЃРїР»СѓР°С‚Р°С†РёРѕРЅРЅС‹Рµ Р·Р°С‚СЂР°С‚С‹ РїР°СЂРєР°",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
@@ -138,12 +280,12 @@ fun FleetAnalyticsTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Удельная себестоимость 1 км:",
+                            text = "РЈРґРµР»СЊРЅР°СЏ СЃРµР±РµСЃС‚РѕРёРјРѕСЃС‚СЊ 1 РєРј:",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = String.format(java.util.Locale.US, "%.2f ₽ / км", summary.costPerKm),
+                            text = String.format(java.util.Locale.US, "%.2f в‚Ѕ / РєРј", summary.costPerKm),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -152,9 +294,9 @@ fun FleetAnalyticsTab(
             }
         }
 
-        // Breakdown Cards: Топливо, ТО и Сервис, Документы
+        // Breakdown Cards: РўРѕРїР»РёРІРѕ, РўРћ Рё РЎРµСЂРІРёСЃ, Р”РѕРєСѓРјРµРЅС‚С‹
         Text(
-            text = "Структура расходов автопарка",
+            text = "РЎС‚СЂСѓРєС‚СѓСЂР° СЂР°СЃС…РѕРґРѕРІ Р°РІС‚РѕРїР°СЂРєР°",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -184,7 +326,7 @@ fun FleetAnalyticsTab(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Расход ГСМ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Р Р°СЃС…РѕРґ Р“РЎРњ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = Formatters.formatMoney(summary.totalFuelCost),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -192,7 +334,7 @@ fun FleetAnalyticsTab(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${summary.totalFuelLiters.toInt()} литров ДТ",
+                        text = "${summary.totalFuelLiters.toInt()} Р»РёС‚СЂРѕРІ Р”Рў",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -220,14 +362,14 @@ fun FleetAnalyticsTab(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Сервис и ТО", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("РЎРµСЂРІРёСЃ Рё РўРћ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = Formatters.formatMoney(summary.totalServiceCost),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("ТО-1, ТО-2, ремонты", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                    Text("РўРћ-1, РўРћ-2, СЂРµРјРѕРЅС‚С‹", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }
@@ -257,14 +399,14 @@ fun FleetAnalyticsTab(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Страховки и ДК", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("РЎС‚СЂР°С…РѕРІРєРё Рё Р”Рљ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = Formatters.formatMoney(summary.totalDocumentsCost),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("ОСАГО, КАСКО, пропуска", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                    Text("РћРЎРђР“Рћ, РљРђРЎРљРћ, РїСЂРѕРїСѓСЃРєР°", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
                 }
             }
 
@@ -289,21 +431,21 @@ fun FleetAnalyticsTab(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Общий пробег", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("РћР±С‰РёР№ РїСЂРѕР±РµРі", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = Formatters.formatDistance(summary.totalFleetDistanceKm),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("Все рейсы и ПЛ", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                    Text("Р’СЃРµ СЂРµР№СЃС‹ Рё РџР›", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }
 
         // Driver Payroll & Profitability Card
         Text(
-            text = "ФОТ водителей и экономика перевозок",
+            text = "Р¤РћРў РІРѕРґРёС‚РµР»РµР№ Рё СЌРєРѕРЅРѕРјРёРєР° РїРµСЂРµРІРѕР·РѕРє",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -343,11 +485,11 @@ fun FleetAnalyticsTab(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Фонд оплаты труда водителей",
+                                text = "Р¤РѕРЅРґ РѕРїР»Р°С‚С‹ С‚СЂСѓРґР° РІРѕРґРёС‚РµР»РµР№",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                text = "Начисления (% от фрахта рейсов)",
+                                text = "РќР°С‡РёСЃР»РµРЅРёСЏ (% РѕС‚ С„СЂР°С…С‚Р° СЂРµР№СЃРѕРІ)",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -374,7 +516,7 @@ fun FleetAnalyticsTab(
                 ) {
                     Column(modifier = Modifier.weight(1.1f)) {
                         Text(
-                            text = "Выручка (фрахт):",
+                            text = "Р’С‹СЂСѓС‡РєР° (С„СЂР°С…С‚):",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -392,13 +534,13 @@ fun FleetAnalyticsTab(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Штат водителей:",
+                            text = "РЁС‚Р°С‚ РІРѕРґРёС‚РµР»РµР№:",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${summary.totalDrivers} чел.",
+                            text = "${summary.totalDrivers} С‡РµР».",
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             fontSize = 13.sp
@@ -410,7 +552,7 @@ fun FleetAnalyticsTab(
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(
-                            text = "Чистая прибыль:",
+                            text = "Р§РёСЃС‚Р°СЏ РїСЂРёР±С‹Р»СЊ:",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -428,7 +570,7 @@ fun FleetAnalyticsTab(
 
         // Fleet Status & Readiness Overview
         Text(
-            text = "Готовность и эксплуатация техники",
+            text = "Р“РѕС‚РѕРІРЅРѕСЃС‚СЊ Рё СЌРєСЃРїР»СѓР°С‚Р°С†РёСЏ С‚РµС…РЅРёРєРё",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -448,9 +590,9 @@ fun FleetAnalyticsTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.LocalShipping, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Всего техники в парке:", fontWeight = FontWeight.SemiBold)
+                        Text("Р’СЃРµРіРѕ С‚РµС…РЅРёРєРё РІ РїР°СЂРєРµ:", fontWeight = FontWeight.SemiBold)
                     }
-                    Text("${summary.totalVehicles} ед.", fontWeight = FontWeight.ExtraBold)
+                    Text("${summary.totalVehicles} РµРґ.", fontWeight = FontWeight.ExtraBold)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -463,9 +605,9 @@ fun FleetAnalyticsTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF2E7D32)))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("В рейсе на линии:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Р’ СЂРµР№СЃРµ РЅР° Р»РёРЅРёРё:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("${summary.activeVehiclesOnTrip} ед.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    Text("${summary.activeVehiclesOnTrip} РµРґ.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -478,9 +620,9 @@ fun FleetAnalyticsTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF0288D1)))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Готовы к рейсу (свободны):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Р“РѕС‚РѕРІС‹ Рє СЂРµР№СЃСѓ (СЃРІРѕР±РѕРґРЅС‹):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("${summary.availableVehicles} ед.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0288D1))
+                    Text("${summary.availableVehicles} РµРґ.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0288D1))
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -493,9 +635,9 @@ fun FleetAnalyticsTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFED6C02)))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("На ТО / Ремонте:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("РќР° РўРћ / Р РµРјРѕРЅС‚Рµ:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("${summary.vehiclesInService} ед.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFED6C02))
+                    Text("${summary.vehiclesInService} РµРґ.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFED6C02))
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -510,9 +652,9 @@ fun FleetAnalyticsTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Водительский состав:", fontWeight = FontWeight.SemiBold)
+                        Text("Р’РѕРґРёС‚РµР»СЊСЃРєРёР№ СЃРѕСЃС‚Р°РІ:", fontWeight = FontWeight.SemiBold)
                     }
-                    Text("${summary.totalDrivers} чел.", fontWeight = FontWeight.ExtraBold)
+                    Text("${summary.totalDrivers} С‡РµР».", fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
@@ -532,12 +674,12 @@ fun FleetAnalyticsTab(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Контроль документов и сроков",
+                            text = "РљРѕРЅС‚СЂРѕР»СЊ РґРѕРєСѓРјРµРЅС‚РѕРІ Рё СЃСЂРѕРєРѕРІ",
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE65100)
                         )
                         Text(
-                            text = "Просрочено: ${summary.expiredDocsCount} • Требуют скорого продления (<30 дней): ${summary.expiringDocsCount}.",
+                            text = "РџСЂРѕСЃСЂРѕС‡РµРЅРѕ: ${summary.expiredDocsCount} вЂў РўСЂРµР±СѓСЋС‚ СЃРєРѕСЂРѕРіРѕ РїСЂРѕРґР»РµРЅРёСЏ (<30 РґРЅРµР№): ${summary.expiringDocsCount}.",
                             fontSize = 11.sp,
                             color = Color(0xFFB78103)
                         )
@@ -561,10 +703,17 @@ fun FleetAnalyticsTab(
             ) {
                 Icon(Icons.Default.Assessment, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Перейти к сводным отчетам и реестрам", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("РџРµСЂРµР№С‚Рё Рє СЃРІРѕРґРЅС‹Рј РѕС‚С‡РµС‚Р°Рј Рё СЂРµРµСЃС‚СЂР°Рј", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
 
         Spacer(modifier = Modifier.height(40.dp))
     }
 }
+
+
+
+
+
+
+
